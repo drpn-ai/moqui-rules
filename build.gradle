@@ -1,0 +1,62 @@
+plugins {
+    id 'groovy'
+}
+
+def componentNode = parseComponent(project)
+version = componentNode.'@version'
+
+def moquiDir = projectDir.parentFile.parentFile.parentFile
+def frameworkDir = file(moquiDir.absolutePath + '/framework')
+def runtimeDir = file(moquiDir.absolutePath + '/runtime')
+def jarBaseName = componentNode.'@name'
+def droolsVersion = '10.2.0'
+
+repositories {
+    flatDir name: 'localLib', dirs: frameworkDir.absolutePath + '/lib'
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':framework')
+    implementation "org.drools:drools-engine:${droolsVersion}"
+    implementation "org.drools:drools-model-prototype:${droolsVersion}"
+    implementation "org.drools:drools-model-compiler:${droolsVersion}"
+    testImplementation project(':framework').configurations.testImplementation.allDependencies
+}
+
+test {
+    useJUnitPlatform()
+    testLogging { events "passed", "skipped", "failed" }
+    testLogging.showStandardStreams = true; testLogging.showExceptions = true
+    maxParallelForks 1
+    include '**/*MoquiSuite.class'
+    systemProperty 'moqui.runtime', runtimeDir.absolutePath
+    systemProperty 'moqui.conf', 'conf/MoquiDevConf.xml'
+    systemProperty 'moqui.init.static', 'true'
+    classpath += files(sourceSets.main.output.classesDirs)
+    classpath += files(projectDir.absolutePath)
+    classpath = classpath.filter { it.exists() }
+}
+tasks.withType(JavaCompile).configureEach { options.compilerArgs << "-proc:none" }
+tasks.withType(GroovyCompile).configureEach { options.compilerArgs << "-proc:none" }
+
+check.dependsOn.clear()
+
+tasks.register('cleanLib', Delete) { delete fileTree(dir: projectDir.absolutePath + '/lib', include: '*') }
+clean.dependsOn cleanLib
+
+jar {
+    destinationDirectory = file(projectDir.absolutePath + '/lib')
+    archiveBaseName = jarBaseName
+}
+
+tasks.register('copyDependencies', Copy) {
+    dependsOn cleanLib
+    from {
+        configurations.runtimeClasspath -
+                project(':framework').configurations.runtimeClasspath -
+                files(project(':framework').tasks.named('jar').flatMap { it.archiveFile })
+    }
+    into file(projectDir.absolutePath + '/lib')
+}
+jar.dependsOn copyDependencies

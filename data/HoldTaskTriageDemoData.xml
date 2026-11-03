@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-facade-xml type="demo">
+    <moqui.rules.FactType factTypeId="holdTask" description="One hold task on an order, with its order's status and NetSuite ids"/>
+    <moqui.rules.FactField factTypeId="holdTask" fieldName="workEffortId" valueTypeEnumId="FVT_TEXT"/>
+    <moqui.rules.FactField factTypeId="holdTask" fieldName="orderId" valueTypeEnumId="FVT_TEXT"/>
+    <moqui.rules.FactField factTypeId="holdTask" fieldName="purposeId" valueTypeEnumId="FVT_TEXT" description="Why the order is held"/>
+    <moqui.rules.FactField factTypeId="holdTask" fieldName="taskStatusId" valueTypeEnumId="FVT_TEXT"/>
+    <moqui.rules.FactField factTypeId="holdTask" fieldName="orderStatusId" valueTypeEnumId="FVT_TEXT"/>
+    <moqui.rules.FactField factTypeId="holdTask" fieldName="netSuiteIdCount" valueTypeEnumId="FVT_INTEGER"
+            description="NetSuite order ids of the order that are current now"/>
+    <moqui.rules.FactField factTypeId="holdTask" fieldName="taskAgeDays" valueTypeEnumId="FVT_INTEGER"
+            description="Whole days since the task was created"/>
+
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="01" sequenceNum="1" nodeTypeEnumId="FNT_RECORD"
+            entityName="org.apache.ofbiz.order.order.OrderHeaderWorkEffort"/>
+    <moqui.rules.FactNodeCondition factTypeId="holdTask" nodeSeqId="01" conditionSeqId="01" entityFieldName="workEffortId"
+            operatorEnumId="ENTCO_EQUALS" parameterName="workEffortId"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="02" parentNodeSeqId="01" sequenceNum="2" nodeTypeEnumId="FNT_RECORD"
+            relationshipName="WorkEffort"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="03" parentNodeSeqId="02" sequenceNum="3" nodeTypeEnumId="FNT_VALUE"
+            fieldName="workEffortId" entityFieldName="workEffortId"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="04" parentNodeSeqId="02" sequenceNum="4" nodeTypeEnumId="FNT_VALUE"
+            fieldName="purposeId" entityFieldName="workEffortPurposeTypeId"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="05" parentNodeSeqId="02" sequenceNum="5" nodeTypeEnumId="FNT_VALUE"
+            fieldName="taskStatusId" entityFieldName="statusId"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="06" parentNodeSeqId="01" sequenceNum="6" nodeTypeEnumId="FNT_RECORD"
+            relationshipName="OrderHeader"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="07" parentNodeSeqId="06" sequenceNum="7" nodeTypeEnumId="FNT_VALUE"
+            fieldName="orderId" entityFieldName="orderId"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="08" parentNodeSeqId="06" sequenceNum="8" nodeTypeEnumId="FNT_VALUE"
+            fieldName="orderStatusId" entityFieldName="statusId"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="09" parentNodeSeqId="06" sequenceNum="9" nodeTypeEnumId="FNT_COUNT"
+            fieldName="netSuiteIdCount" relationshipName="OrderIdentification" filterByDate="Y"/>
+    <moqui.rules.FactNodeCondition factTypeId="holdTask" nodeSeqId="09" conditionSeqId="01" entityFieldName="orderIdentificationTypeId"
+            operatorEnumId="ENTCO_EQUALS" fixedValue="NETSUITE_ORDER_ID"/>
+    <moqui.rules.FactNode factTypeId="holdTask" nodeSeqId="10" parentNodeSeqId="02" sequenceNum="10" nodeTypeEnumId="FNT_AGE"
+            fieldName="taskAgeDays" entityFieldName="createdStamp"/>
+
+    <moqui.rules.RuleSet ruleSetId="HOLD_TASK_GROUP" description="How urgent an open hold task is" firstMatchOnly="Y"/>
+    <moqui.rules.RuleSetFactType ruleSetId="HOLD_TASK_GROUP" factTypeId="holdTask"/>
+    <moqui.rules.RuleSetOutcome ruleSetId="HOLD_TASK_GROUP" outcomeId="STALE" description="The order is completed or cancelled"/>
+    <moqui.rules.RuleSetOutcome ruleSetId="HOLD_TASK_GROUP" outcomeId="BLOCKING" description="The order is live and NetSuite does not have it"/>
+    <moqui.rules.RuleSetOutcome ruleSetId="HOLD_TASK_GROUP" outcomeId="AGEING" description="The order is live, NetSuite has it, and the task is over 7 days old"/>
+    <moqui.rules.RuleSetOutcome ruleSetId="HOLD_TASK_GROUP" outcomeId="RECENT" description="The order is live, NetSuite has it, and the task is 7 days old or less"/>
+
+    <moqui.rules.RuleSetRule ruleId="HOLD_TASK_GROUP_STALE" ruleSetId="HOLD_TASK_GROUP" ruleName="stale" priority="40"
+            description="The order is completed or cancelled"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_GROUP_STALE" conditionSeqId="01" sequenceNum="1" conditionTypeId="RCT_ANY"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_GROUP_STALE" conditionSeqId="02" parentConditionSeqId="01" sequenceNum="2"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="orderStatusId" operatorEnumId="ENTCO_EQUALS" compareValue="ORDER_COMPLETED"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_GROUP_STALE" conditionSeqId="03" parentConditionSeqId="01" sequenceNum="3"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="orderStatusId" operatorEnumId="ENTCO_EQUALS" compareValue="ORDER_CANCELLED"/>
+    <moqui.rules.RuleSetAction ruleId="HOLD_TASK_GROUP_STALE" actionSeqId="01" ruleSetId="HOLD_TASK_GROUP" actionTypeId="RAT_OUTCOME" outcomeId="STALE"/>
+
+    <moqui.rules.RuleSetRule ruleId="HOLD_TASK_GROUP_BLOCKING" ruleSetId="HOLD_TASK_GROUP" ruleName="blocking" priority="30"
+            description="A live order that NetSuite does not have"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_GROUP_BLOCKING" conditionSeqId="01" sequenceNum="1" conditionTypeId="RCT_COMPARE"
+            factTypeId="holdTask" fieldName="netSuiteIdCount" operatorEnumId="ENTCO_EQUALS" compareValue="0"/>
+    <moqui.rules.RuleSetAction ruleId="HOLD_TASK_GROUP_BLOCKING" actionSeqId="01" ruleSetId="HOLD_TASK_GROUP" actionTypeId="RAT_OUTCOME" outcomeId="BLOCKING"/>
+
+    <moqui.rules.RuleSetRule ruleId="HOLD_TASK_GROUP_AGEING" ruleSetId="HOLD_TASK_GROUP" ruleName="ageing" priority="20"
+            description="A live order in NetSuite with a task at least 7 whole days old"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_GROUP_AGEING" conditionSeqId="01" sequenceNum="1" conditionTypeId="RCT_COMPARE"
+            factTypeId="holdTask" fieldName="taskAgeDays" operatorEnumId="ENTCO_GREATER_EQ" compareValue="7"/>
+    <moqui.rules.RuleSetAction ruleId="HOLD_TASK_GROUP_AGEING" actionSeqId="01" ruleSetId="HOLD_TASK_GROUP" actionTypeId="RAT_OUTCOME" outcomeId="AGEING"/>
+
+    <moqui.rules.RuleSetRule ruleId="HOLD_TASK_GROUP_RECENT" ruleSetId="HOLD_TASK_GROUP" ruleName="recent" priority="10"
+            description="Any other task: a live order in NetSuite with a task under 7 whole days old"/>
+    <moqui.rules.RuleSetAction ruleId="HOLD_TASK_GROUP_RECENT" actionSeqId="01" ruleSetId="HOLD_TASK_GROUP" actionTypeId="RAT_OUTCOME" outcomeId="RECENT"/>
+
+    <moqui.rules.RuleSet ruleSetId="HOLD_TASK_RESOLVER" description="Who resolves an open hold task, from its purpose" firstMatchOnly="Y"/>
+    <moqui.rules.RuleSetFactType ruleSetId="HOLD_TASK_RESOLVER" factTypeId="holdTask"/>
+    <moqui.rules.RuleSetOutcome ruleSetId="HOLD_TASK_RESOLVER" outcomeId="COMPANY_SERVICE" description="Company resolves it with the OMS's own service"/>
+    <moqui.rules.RuleSetOutcome ruleSetId="HOLD_TASK_RESOLVER" outcomeId="COMPANY_AFTER_CONFIRM" description="Company resolves it after the Support Person confirms"/>
+    <moqui.rules.RuleSetOutcome ruleSetId="HOLD_TASK_RESOLVER" outcomeId="PURPOSE_OWNER" description="Only the Purpose Owner may resolve it"/>
+    <moqui.rules.RuleSetOutcome ruleSetId="HOLD_TASK_RESOLVER" outcomeId="ASK_SUPPORT_PERSON" description="Company does not know the purpose and asks the Support Person"/>
+
+    <moqui.rules.RuleSetRule ruleId="HOLD_TASK_RESOLVER_SERVICE" ruleSetId="HOLD_TASK_RESOLVER" ruleName="own service" priority="40"
+            description="Negative reservations"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_SERVICE" conditionSeqId="01" sequenceNum="1" conditionTypeId="RCT_COMPARE"
+            factTypeId="holdTask" fieldName="purposeId" operatorEnumId="ENTCO_EQUALS" compareValue="NEG_RES_REVIEW"/>
+    <moqui.rules.RuleSetAction ruleId="HOLD_TASK_RESOLVER_SERVICE" actionSeqId="01" ruleSetId="HOLD_TASK_RESOLVER" actionTypeId="RAT_OUTCOME" outcomeId="COMPANY_SERVICE"/>
+
+    <moqui.rules.RuleSetRule ruleId="HOLD_TASK_RESOLVER_CONFIRM" ruleSetId="HOLD_TASK_RESOLVER" ruleName="after confirm" priority="30"
+            description="An unmapped shipping method, or something that did not reach Shopify"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_CONFIRM" conditionSeqId="01" sequenceNum="1" conditionTypeId="RCT_ANY"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_CONFIRM" conditionSeqId="02" parentConditionSeqId="01" sequenceNum="2"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="purposeId" operatorEnumId="ENTCO_EQUALS" compareValue="UNMAPPED_SHIP_METHOD"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_CONFIRM" conditionSeqId="03" parentConditionSeqId="01" sequenceNum="3"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="purposeId" operatorEnumId="ENTCO_EQUALS" compareValue="SHPFY_SYNC_ERR"/>
+    <moqui.rules.RuleSetAction ruleId="HOLD_TASK_RESOLVER_CONFIRM" actionSeqId="01" ruleSetId="HOLD_TASK_RESOLVER" actionTypeId="RAT_OUTCOME" outcomeId="COMPANY_AFTER_CONFIRM"/>
+
+    <moqui.rules.RuleSetRule ruleId="HOLD_TASK_RESOLVER_OWNER" ruleSetId="HOLD_TASK_RESOLVER" ruleName="purpose owner" priority="20"
+            description="A high-risk order, an invalid address, a customer request, a manual hold, or waiting on future inventory"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_OWNER" conditionSeqId="01" sequenceNum="1" conditionTypeId="RCT_ANY"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_OWNER" conditionSeqId="02" parentConditionSeqId="01" sequenceNum="2"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="purposeId" operatorEnumId="ENTCO_EQUALS" compareValue="REVIEW_RISK_ORDER"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_OWNER" conditionSeqId="03" parentConditionSeqId="01" sequenceNum="3"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="purposeId" operatorEnumId="ENTCO_EQUALS" compareValue="INVALID_ADDRESS"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_OWNER" conditionSeqId="04" parentConditionSeqId="01" sequenceNum="4"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="purposeId" operatorEnumId="ENTCO_EQUALS" compareValue="ORD_HOLD_CUST_REQ"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_OWNER" conditionSeqId="05" parentConditionSeqId="01" sequenceNum="5"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="purposeId" operatorEnumId="ENTCO_EQUALS" compareValue="ORD_HOLD_MANUAL"/>
+    <moqui.rules.RuleSetCondition ruleId="HOLD_TASK_RESOLVER_OWNER" conditionSeqId="06" parentConditionSeqId="01" sequenceNum="6"
+            conditionTypeId="RCT_COMPARE" factTypeId="holdTask" fieldName="purposeId" operatorEnumId="ENTCO_EQUALS" compareValue="ORD_HOLD_FUTURE_INV"/>
+    <moqui.rules.RuleSetAction ruleId="HOLD_TASK_RESOLVER_OWNER" actionSeqId="01" ruleSetId="HOLD_TASK_RESOLVER" actionTypeId="RAT_OUTCOME" outcomeId="PURPOSE_OWNER"/>
+
+    <moqui.rules.RuleSetRule ruleId="HOLD_TASK_RESOLVER_ASK" ruleSetId="HOLD_TASK_RESOLVER" ruleName="unknown purpose" priority="10"
+            description="Any purpose the rules above do not name"/>
+    <moqui.rules.RuleSetAction ruleId="HOLD_TASK_RESOLVER_ASK" actionSeqId="01" ruleSetId="HOLD_TASK_RESOLVER" actionTypeId="RAT_OUTCOME" outcomeId="ASK_SUPPORT_PERSON"/>
+</entity-facade-xml>
