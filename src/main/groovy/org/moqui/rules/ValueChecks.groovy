@@ -14,6 +14,12 @@ class ValueChecks {
 
     static boolean evaluate(String kind, Object a, Object b, BigDecimal tolerance) {
         switch (kind) {
+            case "=": return equalValues(a, b)
+            case "!=": return !equalValues(a, b)
+            case "<": return compareValues(a, b) < 0
+            case ">": return compareValues(a, b) > 0
+            case "<=": return compareValues(a, b) <= 0
+            case ">=": return compareValues(a, b) >= 0
             case "requires": return !isTrue(a) || isTrue(b)
             case "required by": return !isTrue(b) || isTrue(a)
             case "all in": return b == null || valueList(b).containsAll(valueList(a))
@@ -45,6 +51,14 @@ class ValueChecks {
         BigDecimal leftNumber = toBigDecimal(left), rightNumber = toBigDecimal(right)
         if (leftNumber != null && rightNumber != null) return leftNumber.compareTo(rightNumber) == 0
         return Objects.equals(left, right) || left.toString().trim() == right.toString().trim()
+    }
+
+    /** Numbers as BigDecimal, null before everything, anything else as text. */
+    static int compareValues(Object left, Object right) {
+        if (left == null || right == null) return left == right ? 0 : (left == null ? -1 : 1)
+        BigDecimal leftNumber = toBigDecimal(left), rightNumber = toBigDecimal(right)
+        if (leftNumber != null && rightNumber != null) return leftNumber.compareTo(rightNumber)
+        return left.toString().trim() <=> right.toString().trim()
     }
 
     static BigDecimal toBigDecimal(Object value) {

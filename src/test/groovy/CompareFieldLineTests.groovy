@@ -93,6 +93,16 @@ class CompareFieldLineTests extends Specification {
         "plain greater-than, not greater"                  | field("shopify_amount", "ENTCO_GREATER", "netsuite_amount")         | [shopify_amount: 11, netsuite_amount: 11]              || []
         "not around a plain equals fires on a difference"  | not(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount"))     | [shopify_amount: 11, netsuite_amount: 12]              || ["FAILS"]
         "not around a plain equals, equal amounts pass"    | not(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount"))     | [shopify_amount: 11.0, netsuite_amount: 11.00]         || []
+        "tolerance 0 is plain equality: equal amounts pass" | not(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount", 0)) | [shopify_amount: 10.00, netsuite_amount: 10.00]   || []
+        "tolerance 0 is plain equality: 0.01 apart fails"  | not(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount", 0)) | [shopify_amount: 10.00, netsuite_amount: 10.01]     || ["FAILS"]
+        "greater-than, right side missing: value orders after null" | field("shopify_amount", "ENTCO_GREATER", "netsuite_amount") | [shopify_amount: 12]                  || ["FAILS"]
+        "greater-than, left side missing: null orders first" | field("shopify_amount", "ENTCO_GREATER", "netsuite_amount")     | [netsuite_amount: 11]                                || []
+        "less-than, left side missing: null orders first"  | field("shopify_amount", "ENTCO_LESS", "netsuite_amount")            | [netsuite_amount: 11]                                || ["FAILS"]
+        "integer 10 equals decimal 10.00"                  | not(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount"))     | [shopify_amount: 10, netsuite_amount: 10.00]         || []
+        "text 10 equals number 10"                         | not(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount"))     | [shopify_amount: "10", netsuite_amount: 10]          || []
+        "not-equals with one side missing differs"         | field("shopify_amount", "ENTCO_NOT_EQUALS", "netsuite_amount")      | [shopify_amount: 10]                                 || ["FAILS"]
+        "less-or-equal on equal amounts"                   | field("shopify_amount", "ENTCO_LESS_EQ", "netsuite_amount")         | [shopify_amount: 10, netsuite_amount: 10.0]          || ["FAILS"]
+        "greater-or-equal on a smaller left"               | field("shopify_amount", "ENTCO_GREATER_EQ", "netsuite_amount")      | [shopify_amount: 9, netsuite_amount: 10]             || []
     }
 
     def "a tolerance on anything but equals, an unknown other field, or a list field is refused at save"() {

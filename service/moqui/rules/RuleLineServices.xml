@@ -164,20 +164,18 @@
 
     <service verb="prepare" noun="CompareFieldLine" authenticate="anonymous-all" allow-remote="false">
         <implements service="moqui.rules.RuleLineServices.prepare#RuleLine"/>
-        <description>Compare one field of a fact with another field of the same fact. Plain comparisons stay Moqui
-            conditions; a tolerance, requires, required by, all in and contains all become value checks.</description>
+        <description>Compare one field of a fact with another field of the same fact. Every operator is a value check
+            with Darpan's semantics (a tolerance of 0 is plain equality).</description>
         <actions>
             <set field="problems" from="[]"/>
             <set field="factTypeIds" from="[line.factTypeId]"/>
-            <set field="plainOperators" from="[ENTCO_EQUALS: 'ENTCO_NOT_EQUALS', ENTCO_NOT_EQUALS: 'ENTCO_EQUALS',
-                    ENTCO_LESS: 'ENTCO_GREATER_EQ', ENTCO_GREATER_EQ: 'ENTCO_LESS', ENTCO_GREATER: 'ENTCO_LESS_EQ',
-                    ENTCO_LESS_EQ: 'ENTCO_GREATER']"/>
             <set field="pairKinds" from="[FPO_REQUIRES: 'requires', FPO_REQUIRED_BY: 'required by', FPO_ALL_IN: 'all in',
-                    FPO_CONTAINS_ALL: 'contains all']"/>
+                    FPO_CONTAINS_ALL: 'contains all', ENTCO_EQUALS: '=', ENTCO_NOT_EQUALS: '!=', ENTCO_LESS: '&lt;',
+                    ENTCO_GREATER: '&gt;', ENTCO_LESS_EQ: '&lt;=', ENTCO_GREATER_EQ: '&gt;=']"/>
 
             <if condition="childLines">
                 <script>problems.add("a compare two fields line takes no lines under it")</script></if>
-            <if condition="!plainOperators.containsKey(line.operatorEnumId) &amp;&amp; !pairKinds.containsKey(line.operatorEnumId)">
+            <if condition="!pairKinds.containsKey(line.operatorEnumId)">
                 <script>problems.add("operator ${line.operatorEnumId} is not allowed".toString())</script></if>
 
             <set field="fieldNames" from="[line.fieldName, line.compareFieldName]"/>
@@ -192,8 +190,8 @@
                 </if>
             </iterate>
 
-            <set field="hasTolerance" from="line.tolerance != null &amp;&amp; line.tolerance.toString().trim() != ''"/>
-            <if condition="hasTolerance">
+            <set field="hasToleranceValue" from="line.tolerance != null &amp;&amp; line.tolerance.toString().trim() != ''"/>
+            <if condition="hasToleranceValue">
                 <if condition="line.operatorEnumId != 'ENTCO_EQUALS'">
                     <script>problems.add("a tolerance only goes with the equals operator".toString())</script>
                     <else-if condition="(line.tolerance as BigDecimal) &lt; 0">
@@ -202,19 +200,13 @@
             </if>
             <if condition="problems"><return/></if>
 
+            <!-- a tolerance of 0 is no tolerance: plain equality -->
+            <set field="hasTolerance" from="hasToleranceValue &amp;&amp; (line.tolerance as BigDecimal) &gt; 0"/>
             <set field="conditionFactory" from="ec.entity.conditionFactory"/>
-            <if condition="pairKinds.containsKey(line.operatorEnumId) || hasTolerance">
-                <set field="check" from="[kind: pairKinds.get(line.operatorEnumId) ?: 'equals within', fieldName: line.fieldName,
-                        compareFieldName: line.compareFieldName, tolerance: hasTolerance ? (line.tolerance as BigDecimal) : null]"/>
-                <set field="matches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: true]]]"/>
-                <set field="notMatches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: false]]]"/>
-                <else>
-                    <set field="matches" from="[condition: conditionFactory.makeConditionToField(line.fieldName,
-                            conditionFactory.comparisonOperatorFromEnumId(line.operatorEnumId), line.compareFieldName), itemChecks: [], valueChecks: []]"/>
-                    <set field="notMatches" from="[condition: conditionFactory.makeConditionToField(line.fieldName,
-                            conditionFactory.comparisonOperatorFromEnumId(plainOperators[line.operatorEnumId]), line.compareFieldName), itemChecks: [], valueChecks: []]"/>
-                </else>
-            </if>
+            <set field="check" from="[kind: hasTolerance ? 'equals within' : pairKinds.get(line.operatorEnumId), fieldName: line.fieldName,
+                    compareFieldName: line.compareFieldName, tolerance: hasTolerance ? (line.tolerance as BigDecimal) : null]"/>
+            <set field="matches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: true]]]"/>
+            <set field="notMatches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: false]]]"/>
         </actions>
     </service>
 
