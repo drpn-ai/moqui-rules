@@ -19,6 +19,12 @@
     <eeca id="BuiltRuleSetRuleConditionTypeCache" entity="rules.RuleConditionType" on-create="true" on-update="true" on-delete="true">
         <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
 
+    <!-- Until built decisions record which pieces they use, any change to a piece rebuilds every decision. -->
+    <eeca id="BuiltRuleSetRulePieceCache" entity="rules.RulePiece" on-create="true" on-update="true" on-delete="true">
+        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+    <eeca id="BuiltRuleSetRulePieceConditionCache" entity="rules.RulePieceCondition" on-create="true" on-update="true" on-delete="true">
+        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+
     <eeca id="BuiltFactFactTypeCache" entity="rules.FactType" on-create="true" on-update="true" on-delete="true">
         <actions><script>ec.cache.getCache('moqui.rules.built.fact').clear()</script></actions></eeca>
     <eeca id="BuiltFactFactFieldCache" entity="rules.FactField" on-create="true" on-update="true" on-delete="true">

@@ -7,21 +7,32 @@
             service its RuleConditionType names, lines under it first. A top line must read exactly one fact type, one the
             decision reads directly, and a rule reads at most 3 fact types. Used by store#Rule and by the decision builder.</description>
         <in-parameters>
-            <parameter name="ruleSetId" required="true"/>
+            <parameter name="ruleSetId"><description>The decision whose fact types the lines are checked against. Not needed
+                when readFactTypeIds is given.</description></parameter>
             <parameter name="ruleName" required="true"/>
             <parameter name="conditions" type="List"><description>Maps of conditionSeqId, parentConditionSeqId, sequenceNum,
                 conditionTypeId, factTypeId, fieldName, operatorEnumId, compareValue, compareFieldName and tolerance.</description></parameter>
+            <parameter name="readFactTypeIds" type="List"><description>Check against these fact types instead of a decision's.</description></parameter>
+            <parameter name="directFactTypeIds" type="List"><description>With readFactTypeIds: the ones a top line may read.</description></parameter>
+            <parameter name="pieceChain" type="List"><description>The pieces being expanded, outermost first, to refuse a piece
+                that uses itself and nesting past 3 levels.</description></parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="problems" type="List"/>
             <parameter name="savedRows" type="List"><description>The lines to save, parents first, numbered in order.</description></parameter>
+            <parameter name="topLines" type="List"><description>What each top line gave, in order.</description></parameter>
             <parameter name="factMatches" type="Map"><description>For each fact type the rule reads, a map of condition and
                 itemChecks that a fact must match. Empty when there are problems.</description></parameter>
         </out-parameters>
         <actions>
             <set field="problems" from="[]"/>
-            <service-call name="moqui.rules.RuleServices.get#DecisionFactTypes" in-map="[ruleSetId: ruleSetId]"
-                    out-map="decisionFactTypes" out-map-add-to-existing="false"/>
+            <if condition="readFactTypeIds != null">
+                <set field="decisionFactTypes" from="[factTypeIds: readFactTypeIds, directFactTypeIds: directFactTypeIds ?: readFactTypeIds]"/>
+                <else>
+                    <service-call name="moqui.rules.RuleServices.get#DecisionFactTypes" in-map="[ruleSetId: ruleSetId]"
+                            out-map="decisionFactTypes" out-map-add-to-existing="false"/>
+                </else>
+            </if>
             <set field="readFactTypeIds" from="decisionFactTypes.factTypeIds"/>
             <set field="rows" from="(conditions ?: []).sort(false) { it.sequenceNum }"/>
             <if condition="rows.any { !it.conditionSeqId }">
@@ -50,7 +61,7 @@
                     <set field="prepared" from="[problems: ['condition type ' + row.conditionTypeId + ' is not known'], factTypeIds: []]"/>
                     <else>
                         <service-call name="${conditionType.prepareServiceName}" out-map="prepared" out-map-add-to-existing="false"
-                                in-map="[line: row, childLines: childLines, readFactTypeIds: readFactTypeIds]"/>
+                                in-map="[line: row, childLines: childLines, readFactTypeIds: readFactTypeIds, pieceChain: pieceChain ?: []]"/>
                     </else>
                 </if>
                 <script>preparedBySeqId.put(row.conditionSeqId, prepared + [conditionSeqId: row.conditionSeqId])
@@ -86,6 +97,66 @@
         </actions>
     </service>
 
+    <service verb="prepare" noun="PieceLine" authenticate="anonymous-all" allow-remote="false">
+        <implements service="moqui.rules.RuleLineServices.prepare#RuleLine"/>
+        <description>Use a named piece: compareValue holds the pieceId. The piece's own lines are prepared the way a rule's
+            are, against the fact types the decision reads, and give their AND as this one line. A piece that uses itself,
+            or nests past 3 levels, is refused.</description>
+        <actions>
+            <set field="problems" from="[]"/>
+            <set field="factTypeIds" from="[]"/>
+            <set field="chain" from="pieceChain ?: []"/>
+            <set field="pieceId" from="line.compareValue"/>
+            <if condition="childLines">
+                <script>problems.add("a piece line takes no lines under it")</script></if>
+            <if condition="pieceId in chain">
+                <script>problems.add("piece ${pieceId} uses itself: ${(chain.subList(chain.indexOf(pieceId), chain.size()) + [pieceId]).join(' &gt; ')}".toString())</script>
+                <return/>
+            </if>
+            <if condition="chain.size() &gt;= 3">
+                <script>problems.add("piece ${pieceId} is nested more than 3 levels deep: ${(chain + [pieceId]).join(' &gt; ')}".toString())</script>
+                <return/>
+            </if>
+            <entity-find-one entity-name="rules.RulePiece" value-field="piece">
+                <field-map field-name="pieceId"/></entity-find-one>
+            <if condition="piece == null">
+                <script>problems.add("piece ${pieceId} does not exist".toString())</script>
+                <return/>
+            </if>
+            <set field="factTypeIds" from="[piece.factTypeId]"/>
+            <if condition="!(piece.factTypeId in readFactTypeIds)">
+                <script>problems.add("the decision does not read ${piece.factTypeId}, which piece ${pieceId} is over".toString())</script>
+                <return/>
+            </if>
+
+            <entity-find entity-name="rules.RulePieceCondition" list="pieceLines">
+                <econdition field-name="pieceId"/><order-by field-name="sequenceNum"/></entity-find>
+            <service-call name="moqui.rules.RuleLineServices.prepare#RuleLines" out-map="preparedPiece" out-map-add-to-existing="false"
+                    in-map="[ruleName: 'piece ' + pieceId, conditions: pieceLines.collect { it.getMap() },
+                        readFactTypeIds: readFactTypeIds, directFactTypeIds: [piece.factTypeId], pieceChain: chain + [pieceId]]"/>
+            <script>problems.addAll(preparedPiece.problems)</script>
+            <if condition="problems"><return/></if>
+            <if condition="!preparedPiece.topLines">
+                <script>problems.add("piece ${pieceId} has no lines".toString())</script>
+                <return/>
+            </if>
+            <if condition="preparedPiece.factMatches.keySet() != [piece.factTypeId] as Set">
+                <script>problems.add("piece ${pieceId} has lines that read a fact type other than ${piece.factTypeId}".toString())</script>
+                <return/>
+            </if>
+
+            <set field="inner" from="preparedPiece.topLines"/>
+            <set field="conditionFactory" from="ec.entity.conditionFactory"/>
+            <set field="matches" from="[condition: conditionFactory.makeCondition(inner*.matches*.condition, org.moqui.entity.EntityCondition.AND),
+                    itemChecks: inner.collectMany { it.matches.itemChecks },
+                    valueChecks: inner.collectMany { it.matches.valueChecks ?: [] }]"/>
+            <if condition="inner.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks &amp;&amp; !it.notMatches.valueChecks }">
+                <set field="notMatches" from="[condition: conditionFactory.makeCondition(inner*.notMatches*.condition,
+                        org.moqui.entity.EntityCondition.OR), itemChecks: [], valueChecks: []]"/>
+            </if>
+        </actions>
+    </service>
+
     <service verb="prepare" noun="RuleLine" type="interface">
         <description>Check one "when" line and turn it into a Moqui condition, as written and turned around. Each
             RuleConditionType names the service for its kind in prepareServiceName. A line with problems gives no conditions.</description>
@@ -95,6 +166,7 @@
             <parameter name="childLines" type="List"><description>What this service gave for each line directly under it.</description></parameter>
             <parameter name="readFactTypeIds" type="List" required="true"><description>The fact types the decision reads,
                 list item types included.</description></parameter>
+            <parameter name="pieceChain" type="List"><description>The pieces being expanded around this line, outermost first.</description></parameter>
             <parameter name="valueTypeEnumId"><description>Check as if the field held this kind of value, for a field
                 whose kind is being changed.</description></parameter>
         </in-parameters>

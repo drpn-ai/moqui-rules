@@ -30,6 +30,9 @@
     <rules.RuleConditionType conditionTypeId="RCT_COMPARE_FIELD" description="Compare Two Fields"
             prepareServiceName="moqui.rules.RuleLineServices.prepare#CompareFieldLine"/>
 
+    <rules.RuleConditionType conditionTypeId="RCT_PIECE" description="A Named Piece"
+            prepareServiceName="moqui.rules.RuleLineServices.prepare#PieceLine"/>
+
     <moqui.basic.EnumerationType enumTypeId="FieldPairOperator" description="Operator Between Two Fields"/>
     <moqui.basic.Enumeration enumTypeId="FieldPairOperator" enumId="FPO_REQUIRES" description="requires" sequenceNum="1"/>
     <moqui.basic.Enumeration enumTypeId="FieldPairOperator" enumId="FPO_REQUIRED_BY" description="required by" sequenceNum="2"/>

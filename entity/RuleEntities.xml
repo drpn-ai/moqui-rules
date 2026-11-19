@@ -153,6 +153,47 @@
         <alias name="ruleName" entity-alias="RSR"/>
     </view-entity>
 
+    <entity entity-name="RulePiece" package="rules" use="configuration">
+        <description>A named piece: a condition written once and used by many rules, through a line of type RCT_PIECE.</description>
+        <field name="pieceId" type="id" is-pk="true"/>
+        <field name="description" type="text-medium" enable-audit-log="true"/>
+        <field name="factTypeId" type="id" enable-audit-log="true"><description>The fact type the piece's lines read.</description></field>
+        <field name="changedDate" type="date-time"/>
+        <relationship type="one" related="rules.FactType"/>
+        <relationship type="many" related="rules.RulePieceCondition" short-alias="conditions"><key-map field-name="pieceId"/></relationship>
+    </entity>
+    <entity entity-name="RulePieceCondition" package="rules" use="configuration">
+        <description>One line of a named piece, with the same columns as a "when" line of a rule.</description>
+        <field name="pieceId" type="id" is-pk="true"/>
+        <field name="conditionSeqId" type="id" is-pk="true"/>
+        <field name="parentConditionSeqId" type="id" enable-audit-log="true"/>
+        <field name="sequenceNum" type="number-integer" enable-audit-log="true"/>
+        <field name="conditionTypeId" type="id" enable-audit-log="true"/>
+        <field name="factTypeId" type="id" enable-audit-log="true"/>
+        <field name="fieldName" type="id" enable-audit-log="true"/>
+        <field name="operatorEnumId" type="id" enable-audit-log="true"/>
+        <field name="compareValue" type="text-medium" enable-audit-log="true"/>
+        <field name="compareFieldName" type="id" enable-audit-log="true"><description>The other field of the same fact a compare-two-fields line reads.</description></field>
+        <field name="tolerance" type="number-decimal" enable-audit-log="true"><description>How far apart two numbers may be and still count as equal.</description></field>
+        <relationship type="one" related="rules.RulePiece"/>
+        <relationship type="one" title="Parent" related="rules.RulePieceCondition" short-alias="parent">
+            <key-map field-name="pieceId"/><key-map field-name="parentConditionSeqId" related="conditionSeqId"/></relationship>
+        <relationship type="one" related="rules.RuleConditionType" short-alias="conditionType"/>
+        <relationship type="one" title="ComparisonOperator" related="moqui.basic.Enumeration" short-alias="operator">
+            <key-map field-name="operatorEnumId" related="enumId"/></relationship>
+    </entity>
+    <view-entity entity-name="RuleSetConditionPieceUse" package="rules">
+        <description>Each rule that has a line using a named piece.</description>
+        <member-entity entity-alias="RSC" entity-name="rules.RuleSetCondition"/>
+        <member-entity entity-alias="RSR" entity-name="rules.RuleSetRule" join-from-alias="RSC">
+            <key-map field-name="ruleId"/></member-entity>
+        <alias name="ruleId" entity-alias="RSC"/>
+        <alias name="conditionSeqId" entity-alias="RSC"/>
+        <alias name="pieceId" entity-alias="RSC" field="compareValue"/>
+        <alias name="ruleSetId" entity-alias="RSR"/>
+        <entity-condition><econdition entity-alias="RSC" field-name="conditionTypeId" value="RCT_PIECE"/></entity-condition>
+    </view-entity>
+
     <entity entity-name="RuleActionType" package="rules" use="configuration" cache="true">
         <description>One kind of "then" part, like return an outcome or add a fact, with the service that checks an action of
             this kind and gives what the decision needs from it.</description>

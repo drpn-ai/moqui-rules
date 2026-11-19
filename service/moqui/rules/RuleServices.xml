@@ -95,6 +95,61 @@
         </actions>
     </service>
 
+    <service verb="store" noun="Piece" authenticate="true">
+        <description>Record a named piece, a condition written once and used by many rules through a line of type RCT_PIECE,
+            or change it in place when the piece exists. Its lines are checked against its own fact type, and a piece that
+            uses itself, directly or through other pieces, is refused with the chain. Rules using it are rebuilt on their
+            next call. A refusal reports every problem together and saves nothing.</description>
+        <in-parameters>
+            <parameter name="pieceId" required="true"/>
+            <parameter name="description"/>
+            <parameter name="factTypeId" required="true"/>
+            <parameter name="conditions" type="List"><description>The same maps store#Rule takes. Lines with no parent must all match.</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="pieceId"/>
+        </out-parameters>
+        <actions>
+            <set field="problems" from="[]"/>
+            <entity-find-one entity-name="rules.FactType" value-field="pieceFactType">
+                <field-map field-name="factTypeId"/></entity-find-one>
+            <if condition="pieceFactType == null">
+                <script>problems.add("Fact type ${factTypeId} does not exist".toString())</script></if>
+            <if condition="!conditions"><script>problems.add("A piece needs at least one line")</script></if>
+            <if condition="pieceFactType != null &amp;&amp; conditions">
+                <service-call name="moqui.rules.RuleLineServices.prepare#RuleLines" out-map="preparedLines"
+                        in-map="[ruleName: 'piece ' + pieceId, conditions: conditions, readFactTypeIds: [factTypeId],
+                            directFactTypeIds: [factTypeId], pieceChain: [pieceId]]"/>
+                <script>problems.addAll(preparedLines.problems)</script>
+                <if condition="!problems &amp;&amp; preparedLines.factMatches.keySet() != [factTypeId] as Set">
+                    <script>problems.add("The lines of piece ${pieceId} must read ${factTypeId}".toString())</script></if>
+            </if>
+            <iterate list="problems" entry="problem"><message error="true">${problem}</message></iterate>
+            <check-errors/>
+
+            <entity-find-one entity-name="rules.RulePiece" value-field="existingPiece" for-update="true"/>
+            <if condition="existingPiece == null">
+                <service-call name="create#rules.RulePiece" out-map="context" in-map="[pieceId: pieceId, description: description,
+                        factTypeId: factTypeId, changedDate: ec.user.nowTimestamp, conditions: preparedLines.savedRows]"/>
+                <return/>
+            </if>
+
+            <entity-find entity-name="rules.RulePieceCondition" list="existingLines">
+                <econdition field-name="pieceId"/></entity-find>
+            <set field="lineRows" from="preparedLines.savedRows"/>
+            <service-call name="store#rules.RulePiece" in-map="[pieceId: pieceId, description: description,
+                    factTypeId: factTypeId, changedDate: ec.user.nowTimestamp, conditions: lineRows]"/>
+            <set field="keptLineSeqIds" from="lineRows*.conditionSeqId"/>
+            <set field="removedLines" from="existingLines.findAll { !(it.conditionSeqId in keptLineSeqIds) }"/>
+            <set field="leafLines" from="removedLines.findAll { leaf -> !removedLines.any { it.parentConditionSeqId == leaf.conditionSeqId } }"/>
+            <while condition="leafLines">
+                <iterate list="leafLines" entry="leafLine"><entity-delete value-field="leafLine"/></iterate>
+                <set field="removedLines" from="removedLines - leafLines"/>
+                <set field="leafLines" from="removedLines.findAll { leaf -> !removedLines.any { it.parentConditionSeqId == leaf.conditionSeqId } }"/>
+            </while>
+        </actions>
+    </service>
+
     <service verb="build" noun="Fact" authenticate="true">
         <description>Build one fact by running the XML actions written from the fact tree of its fact type. The actions
             are written once and kept until a row of a fact tree is created, changed or deleted. Each value is converted to

@@ -9,7 +9,7 @@ class RulesTestData {
         if (checked) return
         boolean wasDisabled = ec.artifactExecution.disableAuthz()
         try {
-            if (ec.entity.find("rules.RuleConditionType").condition("conditionTypeId", "RCT_COMPARE_FIELD").count() == 0) {
+            if (ec.entity.find("rules.RuleConditionType").condition("conditionTypeId", "RCT_PIECE").count() == 0) {
                 ec.entity.makeDataLoader().location("component://moqui-rules/data/RuleSeedData.xml").load()
                 ec.entity.makeDataLoader().location("component://moqui-rules/data/RuleDemoData.xml").load()
             }
