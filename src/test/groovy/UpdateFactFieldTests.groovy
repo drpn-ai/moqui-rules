@@ -14,7 +14,7 @@ class UpdateFactFieldTests extends Specification {
         ec.artifactExecution.disableAuthz()
         removeTestData()
         ec.entity.makeValue("rules.FactType").setAll([factTypeId: factTypeId]).create()
-        [code: "FVT_INTEGER", amount: "FVT_DECIMAL", reason: "FVT_TEXT"].each { String fieldName, String valueTypeEnumId ->
+        [code: "FVT_INTEGER", amount: "FVT_DECIMAL", reason: "FVT_TEXT", tryCount: "FVT_TEXT"].each { String fieldName, String valueTypeEnumId ->
             ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: fieldName,
                     valueTypeEnumId: valueTypeEnumId]).create()
         }
@@ -24,6 +24,8 @@ class UpdateFactFieldTests extends Specification {
         storeRule("code seven", 30, "code", "ENTCO_EQUALS", "7")
         storeRule("big refund", 20, "amount", "ENTCO_GREATER", "30")
         storeRule("damaged", 10, "reason", "ENTCO_LIKE", "%damage%")
+        storePiece("RULES_TEST_PIECE_KIND", "tryCount", "ENTCO_EQUALS", "abc")
+        storePiece("RULES_TEST_PIECE_LIKE", "tryCount", "ENTCO_LIKE", "%ab%")
     }
 
     def cleanupSpec() {
@@ -34,6 +36,9 @@ class UpdateFactFieldTests extends Specification {
     }
 
     void removeTestData() {
+        List<String> pieceIds = ["RULES_TEST_PIECE_KIND", "RULES_TEST_PIECE_LIKE"]
+        ec.entity.find("rules.RulePieceCondition").condition("pieceId", "in", pieceIds).deleteAll()
+        ec.entity.find("rules.RulePiece").condition("pieceId", "in", pieceIds).deleteAll()
         List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
         if (ruleIds) {
             for (String entityName in ["RuleSetAction", "RuleSetCondition", "RuleSetRule"])
@@ -43,6 +48,13 @@ class UpdateFactFieldTests extends Specification {
             ec.entity.find("rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
         ec.entity.find("rules.FactField").condition("factTypeId", factTypeId).deleteAll()
         ec.entity.find("rules.FactType").condition("factTypeId", factTypeId).deleteAll()
+    }
+
+    void storePiece(String pieceId, String fieldName, String operatorEnumId, String compareValue) {
+        ec.service.sync().name("moqui.rules.RuleServices.store#Piece").parameters([pieceId: pieceId, factTypeId: factTypeId,
+                conditions: [[conditionSeqId: "01", conditionTypeId: "RCT_COMPARE", factTypeId: factTypeId,
+                fieldName: fieldName, operatorEnumId: operatorEnumId, compareValue: compareValue]]]).call()
+        assert !ec.message.hasError(), ec.message.errorsString
     }
 
     void storeRule(String ruleName, int priority, String fieldName, String operatorEnumId, String compareValue) {
@@ -101,5 +113,15 @@ class UpdateFactFieldTests extends Specification {
         "reason"      | "FVT_INTEGER"   | "Rule damaged: operator ENTCO_LIKE works on text fields only"               | "FVT_TEXT"
         "amount"      | "FVT_LIST"      | "can only change between kinds that hold one value"    | "FVT_DECIMAL"
         "noSuchField" | "FVT_TEXT"      | "has no field noSuchField"                             | null
+    }
+
+    def "a kind that a piece line does not fit is refused with the piece named, and the field keeps its kind"() {
+        when:
+        List<String> errors = updateKind("tryCount", "FVT_INTEGER")
+
+        then:
+        errors.any { it.contains("Line of piece RULES_TEST_PIECE_KIND: value abc does not fit field tryCount") }
+        errors.any { it.contains("Line of piece RULES_TEST_PIECE_LIKE: operator ENTCO_LIKE works on text fields only") }
+        kindOf("tryCount") == "FVT_TEXT"
     }
 }

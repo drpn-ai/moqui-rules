@@ -609,7 +609,8 @@
     <service verb="update" noun="FactField" authenticate="true">
         <description>Correct the kind of value of a fact field, like a learned orderId that is an id and so text. Both kinds
             must hold one value. The change is refused, and nothing is saved, when a rule line on the field has a value
-            that does not fit the new kind, or compares with like and the new kind is not text. Decisions that read the
+            that does not fit the new kind, or compares with like and the new kind is not text; named-piece lines are checked
+            the same way. Decisions that read the
             field are built again on their next call.</description>
         <in-parameters>
             <parameter name="factTypeId" required="true"/>
@@ -636,6 +637,15 @@
                 <service-call name="${conditionType.prepareServiceName}" out-map="prepared" out-map-add-to-existing="false"
                         in-map="[line: line, childLines: [], readFactTypeIds: [factTypeId], valueTypeEnumId: valueTypeEnumId]"/>
                 <script>problems.addAll(prepared.problems.collect { "Rule ${line.ruleName}: ${it}".toString() })</script>
+            </iterate>
+            <entity-find entity-name="rules.RulePieceCondition" list="pieceLineList">
+                <econdition field-name="factTypeId"/><econdition field-name="fieldName"/></entity-find>
+            <iterate list="pieceLineList" entry="pieceLine">
+                <entity-find-one entity-name="rules.RuleConditionType" value-field="pieceConditionType">
+                    <field-map field-name="conditionTypeId" from="pieceLine.conditionTypeId"/></entity-find-one>
+                <service-call name="${pieceConditionType.prepareServiceName}" out-map="preparedPiece" out-map-add-to-existing="false"
+                        in-map="[line: pieceLine, childLines: [], readFactTypeIds: [factTypeId], valueTypeEnumId: valueTypeEnumId]"/>
+                <script>problems.addAll(preparedPiece.problems.collect { "Line of piece ${pieceLine.pieceId}: ${it}".toString() })</script>
             </iterate>
             <iterate list="problems" entry="problem"><message error="true">${problem}</message></iterate>
             <check-errors/>
