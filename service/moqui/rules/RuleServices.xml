@@ -165,6 +165,10 @@
             <parameter name="fact" type="Map"/>
         </out-parameters>
         <actions>
+            <!-- Checked with the caller's permissions before the cache: a fact type the caller cannot see does not exist
+                 for it, even when another caller built it already. -->
+            <entity-find-one entity-name="rules.FactType" value-field="factType"/>
+            <if condition="factType == null"><return error="true" message="Fact type ${factTypeId} does not exist"/></if>
             <set field="builtFactCache" from="ec.cache.getCache('moqui.rules.built.fact')"/>
             <set field="builtFact" from="builtFactCache.get(factTypeId)"/>
             <if condition="builtFact == null">

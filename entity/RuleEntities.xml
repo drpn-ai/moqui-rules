@@ -151,6 +151,8 @@
             <key-map field-name="ruleId"/></member-entity>
         <alias-all entity-alias="RSC"/>
         <alias name="ruleName" entity-alias="RSR"/>
+        <!-- Every rule field is aliased too, so an entity filter a host app puts on rules.RuleSetRule applies here. -->
+        <alias-all entity-alias="RSR" prefix="rule"><exclude field="ruleName"/></alias-all>
     </view-entity>
 
     <entity entity-name="RulePiece" table-name="RULES_RULE_PIECE" package="rules" use="configuration">
@@ -191,6 +193,9 @@
         <alias name="conditionSeqId" entity-alias="RSC"/>
         <alias name="pieceId" entity-alias="RSC" field="compareValue"/>
         <alias name="ruleSetId" entity-alias="RSR"/>
+        <!-- Every field of both members is aliased too, so an entity filter a host app puts on either applies here. -->
+        <alias-all entity-alias="RSC" prefix="line"/>
+        <alias-all entity-alias="RSR" prefix="rule"/>
         <entity-condition><econdition entity-alias="RSC" field-name="conditionTypeId" value="RCT_PIECE"/></entity-condition>
     </view-entity>
 

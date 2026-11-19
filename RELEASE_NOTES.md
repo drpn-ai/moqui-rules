@@ -39,6 +39,13 @@
   still compared as numbers.
 - A not line over an all line or a piece with one line under it works for any line, a compare-two-fields line
   included.
+- A host app's entity filter on `rules.RuleSetRule` or `rules.RuleSetCondition` applies through the views
+  `RuleSetConditionAndRule` and `RuleSetConditionPieceUse`: they alias every field of their members (rule fields
+  prefixed `rule`, piece-use line fields prefixed `line`). Before, such a filter made every read of the view fail.
+- Clearing built decisions runs with authz disabled (the entity ECAs call `clear#BuiltDecisions` with
+  `disable-authz`), so it finds every decision a changed row touches whatever filters the writer has.
+- `build#Fact` reads the fact type with the caller's permissions before its built-fact cache: a fact type the caller
+  cannot see answers "Fact type X does not exist", even when another caller built it.
 
 ### New services
 
