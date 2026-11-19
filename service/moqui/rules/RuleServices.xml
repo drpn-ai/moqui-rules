@@ -166,7 +166,10 @@
             <set field="fact" from="[:]"/>
             <set field="values" from="values ?: [:]"/>
             <entity-find entity-name="rules.FactField" list="factFields"><econdition field-name="factTypeId"/></entity-find>
-            <set field="unknownFieldNames" from="values.keySet() - factFields*.fieldName"/>
+            <set field="recordIdField" from="org.moqui.rules.BuiltRuleSet.RECORD_ID_FIELD"/>
+            <if condition="values.containsKey(recordIdField)">
+                <script>problems.add("A fact of ${factTypeId} may not hold a value named ${recordIdField}; give the record id beside the fact".toString())</script></if>
+            <set field="unknownFieldNames" from="values.keySet() - factFields*.fieldName - [recordIdField]"/>
             <iterate list="unknownFieldNames" entry="unknownFieldName">
                 <script>problems.add("Fact type ${factTypeId} has no field ${unknownFieldName}".toString())</script></iterate>
 
@@ -208,11 +211,17 @@
             used from the next call on. Nothing is acted on: the caller acts on the outcomes.</description>
         <in-parameters>
             <parameter name="ruleSetId" required="true"/>
-            <parameter name="facts" type="List" required="true"><description>Maps of factTypeId and fact, the fact being a Map of field values.</description></parameter>
+            <parameter name="facts" type="List" required="true"><description>Maps of factTypeId, fact and recordId, the fact
+                being a Map of field values and recordId optional text naming the caller's record. A record id may be
+                used once per call.</description></parameter>
         </in-parameters>
         <out-parameters>
-            <parameter name="outcomes" type="List"><description>Outcome ids, highest priority first. Only the first when the decision has firstMatchOnly Y.</description></parameter>
-            <parameter name="matchedRules" type="List"><description>Maps of ruleId, ruleName, priority and outcomeId for every rule that matched.</description></parameter>
+            <parameter name="outcomes" type="List"><description>Outcome ids over all facts, highest priority first. Only the first when the decision has firstMatchOnly Y.</description></parameter>
+            <parameter name="matchedRules" type="List"><description>Maps of ruleId, ruleName, priority, outcomeId and recordIds,
+                a Map of factTypeId to the record id of each fact the rule matched, for every rule that matched.</description></parameter>
+            <parameter name="decisions" type="List"><description>One map of recordId, outcomes and matchedRules per fact of
+                the decision's fact type, in input order, each judged alone. Empty when the decision reads more than one
+                fact type directly.</description></parameter>
         </out-parameters>
         <actions>
             <entity-find-one entity-name="rules.RuleSet" value-field="ruleSet"/>
@@ -231,8 +240,12 @@
                 <service-call name="moqui.rules.RuleServices.convert#Fact" out-map="converted" out-map-add-to-existing="false"
                         in-map="[factTypeId: factEntry.factTypeId, values: factEntry.fact]"/>
                 <script>factProblems.addAll(converted.problems)</script>
-                <script>convertedFacts.add([factTypeId: factEntry.factTypeId, fact: converted.fact])</script>
+                <script>convertedFacts.add([factTypeId: factEntry.factTypeId, fact: converted.fact, recordId: factEntry.recordId?.toString()])</script>
             </iterate>
+            <set field="repeatedRecordIds" from="facts.collect { it.recordId?.toString() }.findAll { it != null }
+                    .countBy { it }.findAll { it.value > 1 }.keySet()"/>
+            <iterate list="repeatedRecordIds" entry="repeatedRecordId">
+                <script>factProblems.add("Record id ${repeatedRecordId} is given more than once".toString())</script></iterate>
             <iterate list="factProblems" entry="factProblem"><message error="true">${factProblem}</message></iterate>
             <check-errors/>
 
@@ -241,6 +254,7 @@
             <check-errors/>
             <set field="outcomes" from="decided.outcomes"/>
             <set field="matchedRules" from="decided.matchedRules"/>
+            <set field="decisions" from="decided.decisions"/>
         </actions>
     </service>
 
@@ -389,6 +403,9 @@
                     out-map="read" out-map-add-to-existing="false"/>
             <check-errors/>
             <set field="fileRecords" from="read.records"/>
+            <set field="recordIdField" from="org.moqui.rules.BuiltRuleSet.RECORD_ID_FIELD"/>
+            <if condition="fileRecords.any { it.values?.containsKey(recordIdField) }">
+                <return error="true" message="The file has a column named ${recordIdField}, a name kept for record ids; rename it"/></if>
 
             <entity-find-one entity-name="rules.FactType" value-field="factType"/>
             <if condition="factType == null">
@@ -490,7 +507,7 @@
                     <if condition="ec.message.hasError()">
                         <set field="refusedReasons" from="ec.message.errors.collect()"/>
                         <script>ec.message.clearErrors()</script>
-                        <else><script>checkedRecord.putAll(decided)</script></else>
+                        <else><script>checkedRecord.putAll([outcomes: decided.outcomes, matchedRules: decided.matchedRules])</script></else>
                     </if>
                 </if>
                 <if condition="refusedReasons"><set field="checkedRecord.refusedReasons" from="refusedReasons"/></if>

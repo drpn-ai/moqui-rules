@@ -5,7 +5,7 @@
     <service verb="prepare" noun="RuleLines" authenticate="anonymous-all" allow-remote="false">
         <description>Check every "when" line of one rule and turn them into Moqui conditions. Each line is prepared by the
             service its RuleConditionType names, lines under it first. A top line must read exactly one fact type, one the
-            decision reads directly. Used by store#Rule and by the decision builder.</description>
+            decision reads directly, and a rule reads at most 3 fact types. Used by store#Rule and by the decision builder.</description>
         <in-parameters>
             <parameter name="ruleSetId" required="true"/>
             <parameter name="ruleName" required="true"/>
@@ -67,6 +67,10 @@
                     </else-if>
                 </if>
             </iterate>
+
+            <set field="topFactTypeIds" from="topLines.findAll { it.factTypeIds?.size() == 1 }.collect { it.factTypeIds[0] }.unique()"/>
+            <if condition="topFactTypeIds.size() &gt; 3">
+                <script>problems.add("Rule ${ruleName}: a rule reads at most 3 fact types".toString())</script></if>
 
             <set field="savedRows" from="walkOrder.collect { [conditionSeqId: it.conditionSeqId, parentConditionSeqId: it.parentConditionSeqId,
                     sequenceNum: rows.indexOf(it) + 1, conditionTypeId: it.conditionTypeId, factTypeId: it.factTypeId,
