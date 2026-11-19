@@ -10,6 +10,9 @@ class ExplainTests extends Specification {
     @Shared String pieceId = "RULES_TEST_EXPLAIN_PIECE"
     @Shared String twoKindsRuleSetId = "RULES_TEST_EXPLAIN_TWO"
     @Shared String otherFactTypeId = "RULES_TEST_EXPLAIN_B"
+    @Shared String pairRuleSetId = "RULES_TEST_EXPLAIN_PAIRS"
+    @Shared String pairFactTypeId = "RULES_TEST_EXPLAIN_PAIR"
+    @Shared String itemFactTypeId = "RULES_TEST_EXPLAIN_ITEM"
 
     def setupSpec() {
         ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
@@ -31,6 +34,25 @@ class ExplainTests extends Specification {
         storeRule(twoKindsRuleSetId, "two kinds", 20, "SWITCH_ON", [compare("01", "refusedCount", "ENTCO_EQUALS", "0"),
                 compare("02", "code", "ENTCO_EQUALS", "b") + [factTypeId: otherFactTypeId]])
         storeRule(twoKindsRuleSetId, "one kind", 10, "PUT_BACK", [])
+
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: itemFactTypeId]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: itemFactTypeId, fieldName: "code", valueTypeEnumId: "FVT_TEXT"]).create()
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: pairFactTypeId]).create()
+        [shopify_paid: "FVT_BOOLEAN", hotwax_hasPayment: "FVT_BOOLEAN", shopify_amount: "FVT_DECIMAL", netsuite_amount: "FVT_DECIMAL"].each { name, type ->
+            ec.entity.makeValue("rules.FactField").setAll([factTypeId: pairFactTypeId, fieldName: name, valueTypeEnumId: type]).create() }
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: pairFactTypeId, fieldName: "items", valueTypeEnumId: "FVT_LIST",
+                itemFactTypeId: itemFactTypeId]).create()
+        createDecision(pairRuleSetId, "N")
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: pairRuleSetId, factTypeId: pairFactTypeId]).create()
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: pairRuleSetId, factTypeId: itemFactTypeId]).create()
+        storeRule(pairRuleSetId, "paid has payment", 30, "SWITCH_ON", [[conditionSeqId: "01", conditionTypeId: "RCT_COMPARE_FIELD",
+                factTypeId: pairFactTypeId, fieldName: "shopify_paid", operatorEnumId: "FPO_REQUIRES", compareFieldName: "hotwax_hasPayment"]])
+        storeRule(pairRuleSetId, "amounts agree", 20, "CHECK_AGAIN", [[conditionSeqId: "01", conditionTypeId: "RCT_COMPARE_FIELD",
+                factTypeId: pairFactTypeId, fieldName: "shopify_amount", operatorEnumId: "ENTCO_EQUALS", compareFieldName: "netsuite_amount", tolerance: 1.00]])
+        storeRule(pairRuleSetId, "has item a", 10, "PUT_BACK", [
+                [conditionSeqId: "01", conditionTypeId: "RCT_EXISTS", factTypeId: pairFactTypeId, fieldName: "items"],
+                [conditionSeqId: "02", parentConditionSeqId: "01", conditionTypeId: "RCT_COMPARE", factTypeId: itemFactTypeId, fieldName: "code",
+                 operatorEnumId: "ENTCO_EQUALS", compareValue: "a"]])
 
         createDecision(shapesRuleSetId)
         ec.message.clearAll()
@@ -54,15 +76,15 @@ class ExplainTests extends Specification {
         ec.destroy()
     }
 
-    void createDecision(String id) {
-        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: id, firstMatchOnly: "Y"]).create()
-        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: id, factTypeId: "checkResult"]).create()
+    void createDecision(String id, String firstMatchOnly = "Y") {
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: id, firstMatchOnly: firstMatchOnly]).create()
+        if (id != pairRuleSetId) ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: id, factTypeId: "checkResult"]).create()
         for (String outcomeId in ["SWITCH_ON", "CHECK_AGAIN", "PUT_BACK"])
             ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: id, outcomeId: outcomeId]).create()
     }
 
     void removeAll() {
-        for (String id in [ruleSetId, shapesRuleSetId, twoKindsRuleSetId]) {
+        for (String id in [ruleSetId, shapesRuleSetId, twoKindsRuleSetId, pairRuleSetId]) {
             List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", id).list()*.ruleId
             if (ruleIds) {
                 ec.entity.find("rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
@@ -75,6 +97,8 @@ class ExplainTests extends Specification {
         }
         ec.entity.find("rules.RulePieceCondition").condition("pieceId", pieceId).deleteAll()
         ec.entity.find("rules.RulePiece").condition("pieceId", pieceId).deleteAll()
+        ec.entity.find("rules.FactField").condition("factTypeId", "in", [pairFactTypeId, itemFactTypeId, otherFactTypeId]).deleteAll()
+        ec.entity.find("rules.FactType").condition("factTypeId", "in", [pairFactTypeId, itemFactTypeId]).deleteAll()
         ec.entity.find("rules.FactField").condition("factTypeId", otherFactTypeId).deleteAll()
         ec.entity.find("rules.FactType").condition("factTypeId", otherFactTypeId).deleteAll()
     }
@@ -97,12 +121,16 @@ class ExplainTests extends Specification {
                 .parameters([ruleSetId: id, factTypeId: factTypeId, fact: fact]).call()
     }
 
-    List<String> evaluate(Map fact, String id = ruleSetId) {
+    List<String> evaluate(Map fact, String id = ruleSetId, String factTypeId = "checkResult") {
+        return (List<String>) evaluateFull(fact, id, factTypeId).outcomes
+    }
+
+    Map evaluateFull(Map fact, String id, String factTypeId) {
         ec.message.clearAll()
         Map out = ec.service.sync().name("moqui.rules.RuleServices.evaluate#RuleSet")
-                .parameters([ruleSetId: id, facts: [[factTypeId: "checkResult", fact: fact]]]).call()
+                .parameters([ruleSetId: id, facts: [[factTypeId: factTypeId, fact: fact]]]).call()
         assert !ec.message.hasError(), ec.message.errorsString
-        return (List<String>) out.outcomes
+        return out
     }
 
     static List<Map> sampleFacts() {
@@ -187,5 +215,45 @@ class ExplainTests extends Specification {
     def "a value that does not fit its field is refused"() {
         when: explain([tryCount: "many"])
         then: ec.message.errors.any { it.contains("tryCount") }
+    }
+
+    def "compare-two-fields lines say what they compare, whether they hold, and agree with evaluate"() {
+        expect:
+        List<Map> facts = [
+                [shopify_paid: true, hotwax_hasPayment: true, shopify_amount: 10.00, netsuite_amount: 10.50],
+                [shopify_paid: true, hotwax_hasPayment: false, shopify_amount: 10.00, netsuite_amount: 12.00],
+                [shopify_paid: false, shopify_amount: 10.00],
+                [hotwax_hasPayment: true, netsuite_amount: 10.00],
+                [:]]
+        facts.every { fact ->
+            Map out = explain(fact, pairRuleSetId, pairFactTypeId)
+            Set<String> evaluated = evaluateFull(fact, pairRuleSetId, pairFactTypeId).matchedRules*.ruleName as Set
+            assert (out.rules.findAll { it.matched }*.ruleName as Set) == evaluated, "disagree on ${fact}"
+            true
+        }
+        Map first = explain(facts[1], pairRuleSetId, pairFactTypeId)
+        first.rules*.ruleName == ["paid has payment", "amounts agree", "has item a"]
+        first.rules[0].lines*.text == ["shopify_paid requires hotwax_hasPayment"]
+        first.rules[0].lines*.holds == [false]
+        first.rules[1].lines*.text == ["shopify_amount equals netsuite_amount (within 1)"]  // the tolerance as stored
+        first.rules[1].lines*.holds == [false]
+        explain(facts[0], pairRuleSetId, pairFactTypeId).rules[1].lines*.holds == [true]
+        explain(facts[2], pairRuleSetId, pairFactTypeId).rules[0].lines*.holds == [true]   // unpaid claims nothing
+        explain(facts[3], pairRuleSetId, pairFactTypeId).rules[1].lines*.holds == [false]  // a missing amount fails a tolerance
+    }
+
+    def "an exists line says whether some list item meets its lines, and agrees with evaluate"() {
+        expect:
+        [[items: []], [:], [items: [[code: "b"]]], [items: [[code: "b"], [code: "a"]]]].collect { Map fact ->
+            Map out = explain(fact, pairRuleSetId, pairFactTypeId)
+            Map existsRule = out.rules.find { it.ruleName == "has item a" }
+            assert existsRule.matched == ("has item a" in evaluateFull(fact, pairRuleSetId, pairFactTypeId).matchedRules*.ruleName), "disagree on ${fact}"
+            assert existsRule.lines[0].text == "one items item where"
+            assert existsRule.lines[0].conditionTypeId == "RCT_EXISTS"
+            assert existsRule.lines[0].lines*.text == ["code equals a"]
+            assert existsRule.lines[0].holds == existsRule.matched
+            assert existsRule.lines[0].lines*.holds == [existsRule.matched]
+            existsRule.matched
+        } == [false, false, false, true]
     }
 }
