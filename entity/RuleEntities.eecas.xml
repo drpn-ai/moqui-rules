@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <eecas xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-eca-3.xsd">
     <eeca id="BuiltRuleSetRuleSetFactTypeCache" entity="rules.RuleSetFactType" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[ruleSetId: entityValue.ruleSetId]"/></actions></eeca>
     <eeca id="BuiltRuleSetRuleSetRuleCache" entity="rules.RuleSetRule" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[ruleId: entityValue.ruleId, ruleSetId: entityValue.ruleSetId]"/></actions></eeca>
     <eeca id="BuiltRuleSetRuleSetConditionCache" entity="rules.RuleSetCondition" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[ruleId: entityValue.ruleId]"/></actions></eeca>
     <eeca id="BuiltRuleSetRuleSetActionCache" entity="rules.RuleSetAction" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[ruleId: entityValue.ruleId]"/></actions></eeca>
     <eeca id="BuiltRuleSetRuleSetActionFieldCache" entity="rules.RuleSetActionField" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[ruleId: entityValue.ruleId]"/></actions></eeca>
     <eeca id="BuiltRuleSetFactFieldCache" entity="rules.FactField" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[factTypeId: entityValue.factTypeId]"/></actions></eeca>
     <eeca id="BuiltRuleSetRuleSetOutcomeCache" entity="rules.RuleSetOutcome" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[ruleSetId: entityValue.ruleSetId]"/></actions></eeca>
     <eeca id="BuiltRuleSetRuleActionTypeCache" entity="rules.RuleActionType" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[actionTypeId: entityValue.actionTypeId]"/></actions></eeca>
     <eeca id="BuiltRuleSetRuleConditionTypeCache" entity="rules.RuleConditionType" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[conditionTypeId: entityValue.conditionTypeId]"/></actions></eeca>
 
-    <!-- Until built decisions record which pieces they use, any change to a piece rebuilds every decision. -->
+    <!-- A piece change clears the decisions whose rules use the piece, through other pieces too. -->
     <eeca id="BuiltRuleSetRulePieceCache" entity="rules.RulePiece" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[pieceId: entityValue.pieceId]"/></actions></eeca>
     <eeca id="BuiltRuleSetRulePieceConditionCache" entity="rules.RulePieceCondition" on-create="true" on-update="true" on-delete="true">
-        <actions><script>ec.cache.getCache('moqui.rules.built.rule.set').clear()</script></actions></eeca>
+        <actions><service-call name="moqui.rules.RuleServices.clear#BuiltDecisions" in-map="[pieceId: entityValue.pieceId]"/></actions></eeca>
 
     <eeca id="BuiltFactFactTypeCache" entity="rules.FactType" on-create="true" on-update="true" on-delete="true">
         <actions><script>ec.cache.getCache('moqui.rules.built.fact').clear()</script></actions></eeca>

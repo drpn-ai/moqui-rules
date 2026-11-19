@@ -33,6 +33,13 @@ class RuleSets {
         return ecf.getCache().getCache(CACHE_NAME)
     }
 
+    /** Drop only these decisions from the cache; null means every decision. */
+    void forget(Collection<String> ruleSetIds) {
+        Cache<String, BuiltRuleSet> cache = cache()
+        if (ruleSetIds == null) { cache.clear(); return }
+        for (String ruleSetId in ruleSetIds) cache.remove(ruleSetId)
+    }
+
     void buildAll() {
         ExecutionContext ec = ecf.getExecutionContext()
         try {

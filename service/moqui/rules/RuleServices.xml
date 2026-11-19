@@ -176,6 +176,55 @@
         </actions>
     </service>
 
+    <service verb="clear" noun="BuiltDecisions" authenticate="anonymous-all" allow-remote="false">
+        <description>Drop built decisions that a changed row can have made stale, and no others. A ruleSetId names its
+            decision; a ruleId its rule's decision; a pieceId every decision with a rule using the piece, directly or through
+            other pieces; a factTypeId every decision reading the fact type, directly or through a list field; a condition or
+            action type, every decision. When ids were given and nothing resolves, every decision is dropped.</description>
+        <in-parameters>
+            <parameter name="ruleSetId"/><parameter name="ruleId"/><parameter name="pieceId"/><parameter name="factTypeId"/>
+            <parameter name="conditionTypeId"/><parameter name="actionTypeId"/>
+        </in-parameters>
+        <actions>
+            <set field="clearAll" from="false"/>
+            <set field="affected" from="new LinkedHashSet()"/>
+            <if condition="conditionTypeId || actionTypeId"><set field="clearAll" from="true"/></if>
+            <if condition="ruleSetId"><script>affected.add(ruleSetId)</script></if>
+            <if condition="ruleId">
+                <entity-find-one entity-name="rules.RuleSetRule" value-field="ruleRow" disable-authz="true"/>
+                <if condition="ruleRow != null"><script>affected.add(ruleRow.ruleSetId)</script>
+                    <else-if condition="!ruleSetId"><set field="clearAll" from="true"/></else-if></if>
+            </if>
+            <if condition="pieceId">
+                <set field="pieceIds" from="new LinkedHashSet([pieceId])"/>
+                <set field="waitingPieceIds" from="[pieceId]"/>
+                <while condition="waitingPieceIds">
+                    <entity-find entity-name="rules.RulePieceCondition" list="usingLines" disable-authz="true">
+                        <econdition field-name="conditionTypeId" value="RCT_PIECE"/>
+                        <econdition field-name="compareValue" operator="in" from="waitingPieceIds"/></entity-find>
+                    <set field="waitingPieceIds" from="usingLines*.pieceId.findAll { pieceIds.add(it) }"/>
+                </while>
+                <entity-find entity-name="rules.RuleSetConditionPieceUse" list="pieceUses" disable-authz="true">
+                    <econdition field-name="pieceId" operator="in" from="pieceIds"/></entity-find>
+                <if condition="pieceUses"><script>affected.addAll(pieceUses*.ruleSetId)</script><else><set field="clearAll" from="true"/></else></if>
+            </if>
+            <if condition="factTypeId">
+                <set field="readerTypeIds" from="new LinkedHashSet([factTypeId])"/>
+                <set field="waitingTypeIds" from="[factTypeId]"/>
+                <while condition="waitingTypeIds">
+                    <entity-find entity-name="rules.FactField" list="listFields" disable-authz="true">
+                        <econdition field-name="itemFactTypeId" operator="in" from="waitingTypeIds"/></entity-find>
+                    <set field="waitingTypeIds" from="listFields*.factTypeId.findAll { readerTypeIds.add(it) }"/>
+                </while>
+                <entity-find entity-name="rules.RuleSetFactType" list="readers" disable-authz="true">
+                    <econdition field-name="factTypeId" operator="in" from="readerTypeIds"/></entity-find>
+                <if condition="readers"><script>affected.addAll(readers*.ruleSetId)</script><else><set field="clearAll" from="true"/></else></if>
+            </if>
+            <set field="ruleSets" from="ec.getTool('Rules', org.moqui.rules.RuleSets.class)"/>
+            <if condition="clearAll || !affected"><script>ruleSets.forget(null)</script><else><script>ruleSets.forget(affected)</script></else></if>
+        </actions>
+    </service>
+
     <service verb="get" noun="DecisionFactTypes" authenticate="anonymous-all" allow-remote="false">
         <description>The fact types a decision reads: directly, from its RuleSetFactType rows, and through their list
             fields, whose item types it reads too.</description>
