@@ -33,6 +33,14 @@ test {
     systemProperty 'moqui.runtime', runtimeDir.absolutePath
     systemProperty 'moqui.conf', 'conf/MoquiDevConf.xml'
     systemProperty 'moqui.init.static', 'true'
+    // Specs get their own H2 database (runtime/db/h2/moqui-rules-test), never the dev one: MoquiDefaultConf builds
+    // entity_ds_url from entity_ds_database. Static init runs no empty-db-load, so RulesTestData fills a new one.
+    systemProperty 'entity_ds_database', 'moqui-rules-test'
+    // On an empty database Moqui's class init logs more than log4j's async queue holds (1024 events), and the queue's
+    // only reader waits on that same class init, so the next log call would block forever. When the queue is full,
+    // drop the event instead of waiting: every level (the threshold is OFF), since a WARN or ERROR would block too.
+    systemProperty 'log4j2.asyncQueueFullPolicy', 'Discard'
+    systemProperty 'log4j2.discardThreshold', 'OFF'
     classpath += files(sourceSets.main.output.classesDirs)
     classpath += files(projectDir.absolutePath)
     classpath = classpath.filter { it.exists() }
