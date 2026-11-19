@@ -116,4 +116,22 @@ class CacheClearTests extends Specification {
                 fieldName: "netsuite_status", description: "edited"]).call()
         then: !isCached("RULES_TEST_CACHE_D1"); !isCached("RULES_TEST_CACHE_D2"); isCached("RULES_TEST_CACHE_D3")
     }
+
+    def "creating a piece no rule uses leaves every decision built"() {
+        given: built("RULES_TEST_CACHE_D1"); built("RULES_TEST_CACHE_D2"); built("RULES_TEST_CACHE_D3")
+        when: storePiece("UNUSED", [compare("01", "netsuite_status", "ENTCO_EQUALS", "Closed")])
+        then: isCached("RULES_TEST_CACHE_D1"); isCached("RULES_TEST_CACHE_D2"); isCached("RULES_TEST_CACHE_D3")
+    }
+
+    def "creating and editing a field of a fact type no decision reads leaves every decision built"() {
+        given: built("RULES_TEST_CACHE_D1"); built("RULES_TEST_CACHE_D2"); built("RULES_TEST_CACHE_D3")
+        when:
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: "RULES_TEST_CACHE_UNREAD"]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: "RULES_TEST_CACHE_UNREAD", fieldName: "a", valueTypeEnumId: "FVT_TEXT"]).create()
+        ec.service.sync().name("update#rules.FactField").parameters([factTypeId: "RULES_TEST_CACHE_UNREAD", fieldName: "a", description: "x"]).call()
+        then: isCached("RULES_TEST_CACHE_D1"); isCached("RULES_TEST_CACHE_D2"); isCached("RULES_TEST_CACHE_D3")
+        cleanup:
+        ec.entity.find("rules.FactField").condition("factTypeId", "RULES_TEST_CACHE_UNREAD").deleteAll()
+        ec.entity.find("rules.FactType").condition("factTypeId", "RULES_TEST_CACHE_UNREAD").deleteAll()
+    }
 }

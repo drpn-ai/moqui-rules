@@ -180,7 +180,7 @@
         <description>Drop built decisions that a changed row can have made stale, and no others. A ruleSetId names its
             decision; a ruleId its rule's decision; a pieceId every decision with a rule using the piece, directly or through
             other pieces; a factTypeId every decision reading the fact type, directly or through a list field; a condition or
-            action type, every decision. When ids were given and nothing resolves, every decision is dropped.</description>
+            action type, every decision. A rule row already gone with no ruleSetId given drops every decision; a piece or fact type nobody uses drops none.</description>
         <in-parameters>
             <parameter name="ruleSetId"/><parameter name="ruleId"/><parameter name="pieceId"/><parameter name="factTypeId"/>
             <parameter name="conditionTypeId"/><parameter name="actionTypeId"/>
@@ -206,7 +206,7 @@
                 </while>
                 <entity-find entity-name="rules.RuleSetConditionPieceUse" list="pieceUses" disable-authz="true">
                     <econdition field-name="pieceId" operator="in" from="pieceIds"/></entity-find>
-                <if condition="pieceUses"><script>affected.addAll(pieceUses*.ruleSetId)</script><else><set field="clearAll" from="true"/></else></if>
+                <script>affected.addAll(pieceUses*.ruleSetId)</script>
             </if>
             <if condition="factTypeId">
                 <set field="readerTypeIds" from="new LinkedHashSet([factTypeId])"/>
@@ -218,10 +218,10 @@
                 </while>
                 <entity-find entity-name="rules.RuleSetFactType" list="readers" disable-authz="true">
                     <econdition field-name="factTypeId" operator="in" from="readerTypeIds"/></entity-find>
-                <if condition="readers"><script>affected.addAll(readers*.ruleSetId)</script><else><set field="clearAll" from="true"/></else></if>
+                <script>affected.addAll(readers*.ruleSetId)</script>
             </if>
             <set field="ruleSets" from="ec.getTool('Rules', org.moqui.rules.RuleSets.class)"/>
-            <if condition="clearAll || !affected"><script>ruleSets.forget(null)</script><else><script>ruleSets.forget(affected)</script></else></if>
+            <if condition="clearAll"><script>ruleSets.forget(null)</script><else><script>ruleSets.forget(affected)</script></else></if>
         </actions>
     </service>
 
