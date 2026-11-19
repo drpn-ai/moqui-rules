@@ -12,46 +12,46 @@ class BuildFactTests extends Specification {
     @Shared String currentIdsFactTypeId = "RULES_TEST_CURRENT_IDS"
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeTestFactType()
-        ec.entity.makeValue("moqui.rules.FactType").setAll([factTypeId: runningFactTypeId]).create()
-        ec.entity.makeValue("moqui.rules.FactField").setAll([factTypeId: runningFactTypeId, fieldName: "runningCount",
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: runningFactTypeId]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: runningFactTypeId, fieldName: "runningCount",
                 valueTypeEnumId: "FVT_INTEGER"]).create()
-        ec.entity.makeValue("moqui.rules.FactNode").setAll([factTypeId: runningFactTypeId, nodeSeqId: "01", sequenceNum: 1,
+        ec.entity.makeValue("rules.FactNode").setAll([factTypeId: runningFactTypeId, nodeSeqId: "01", sequenceNum: 1,
                 nodeTypeEnumId: "FNT_COUNT", fieldName: "runningCount", entityName: "moqui.service.job.ServiceJobRun"]).create()
-        ec.entity.makeValue("moqui.rules.FactNodeCondition").setAll([factTypeId: runningFactTypeId, nodeSeqId: "01",
+        ec.entity.makeValue("rules.FactNodeCondition").setAll([factTypeId: runningFactTypeId, nodeSeqId: "01",
                 conditionSeqId: "01", entityFieldName: "jobName", operatorEnumId: "ENTCO_EQUALS", parameterName: "jobName"]).create()
-        ec.entity.makeValue("moqui.rules.FactNodeCondition").setAll([factTypeId: runningFactTypeId, nodeSeqId: "01",
+        ec.entity.makeValue("rules.FactNodeCondition").setAll([factTypeId: runningFactTypeId, nodeSeqId: "01",
                 conditionSeqId: "02", entityFieldName: "endTime", operatorEnumId: "ENTCO_IS_NULL"]).create()
-        ec.entity.makeValue("moqui.rules.FactType").setAll([factTypeId: refusedLogFactTypeId]).create()
-        ec.entity.makeValue("moqui.rules.FactField").setAll([factTypeId: refusedLogFactTypeId, fieldName: "refusedLogCount",
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: refusedLogFactTypeId]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: refusedLogFactTypeId, fieldName: "refusedLogCount",
                 valueTypeEnumId: "FVT_INTEGER"]).create()
-        ec.entity.makeValue("moqui.rules.FactNode").setAll([factTypeId: refusedLogFactTypeId, nodeSeqId: "01", sequenceNum: 1,
+        ec.entity.makeValue("rules.FactNode").setAll([factTypeId: refusedLogFactTypeId, nodeSeqId: "01", sequenceNum: 1,
                 nodeTypeEnumId: "FNT_COUNT", fieldName: "refusedLogCount", entityName: "co.hotwax.datamanager.DataManagerLog"]).create()
-        ec.entity.makeValue("moqui.rules.FactNodeCondition").setAll([factTypeId: refusedLogFactTypeId, nodeSeqId: "01",
+        ec.entity.makeValue("rules.FactNodeCondition").setAll([factTypeId: refusedLogFactTypeId, nodeSeqId: "01",
                 conditionSeqId: "01", entityFieldName: "logId", operatorEnumId: "ENTCO_EQUALS", parameterName: "logId"]).create()
-        ec.entity.makeValue("moqui.rules.FactNodeCondition").setAll([factTypeId: refusedLogFactTypeId, nodeSeqId: "01",
+        ec.entity.makeValue("rules.FactNodeCondition").setAll([factTypeId: refusedLogFactTypeId, nodeSeqId: "01",
                 conditionSeqId: "02", entityFieldName: "failedRecordCount", operatorEnumId: "ENTCO_GREATER", fixedValue: "0"]).create()
-        ec.entity.makeValue("moqui.rules.FactType").setAll([factTypeId: brokenFactTypeId]).create()
-        ec.entity.makeValue("moqui.rules.FactField").setAll([factTypeId: brokenFactTypeId, fieldName: "status",
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: brokenFactTypeId]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: brokenFactTypeId, fieldName: "status",
                 valueTypeEnumId: "FVT_TEXT"]).create()
-        ec.entity.makeValue("moqui.rules.FactNode").setAll([factTypeId: brokenFactTypeId, nodeSeqId: "01", sequenceNum: 1,
+        ec.entity.makeValue("rules.FactNode").setAll([factTypeId: brokenFactTypeId, nodeSeqId: "01", sequenceNum: 1,
                 nodeTypeEnumId: "FNT_RECORD", entityName: "co.hotwax.datamanager.DataManagerLog"]).create()
-        ec.entity.makeValue("moqui.rules.FactNode").setAll([factTypeId: brokenFactTypeId, nodeSeqId: "02", parentNodeSeqId: "01",
+        ec.entity.makeValue("rules.FactNode").setAll([factTypeId: brokenFactTypeId, nodeSeqId: "02", parentNodeSeqId: "01",
                 sequenceNum: 2, nodeTypeEnumId: "FNT_VALUE", fieldName: "status", entityFieldName: "noSuchField"]).create()
-        ec.entity.makeValue("moqui.rules.FactNode").setAll([factTypeId: brokenFactTypeId, nodeSeqId: "03", parentNodeSeqId: "01",
+        ec.entity.makeValue("rules.FactNode").setAll([factTypeId: brokenFactTypeId, nodeSeqId: "03", parentNodeSeqId: "01",
                 sequenceNum: 3, nodeTypeEnumId: "FNT_COUNT", fieldName: "status", relationshipName: "NoSuchRelationship"]).create()
-        ec.entity.makeValue("moqui.rules.FactType").setAll([factTypeId: currentIdsFactTypeId]).create()
-        ec.entity.makeValue("moqui.rules.FactField").setAll([factTypeId: currentIdsFactTypeId, fieldName: "netSuiteIdCount",
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: currentIdsFactTypeId]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: currentIdsFactTypeId, fieldName: "netSuiteIdCount",
                 valueTypeEnumId: "FVT_INTEGER"]).create()
-        ec.entity.makeValue("moqui.rules.FactNode").setAll([factTypeId: currentIdsFactTypeId, nodeSeqId: "01", sequenceNum: 1,
+        ec.entity.makeValue("rules.FactNode").setAll([factTypeId: currentIdsFactTypeId, nodeSeqId: "01", sequenceNum: 1,
                 nodeTypeEnumId: "FNT_COUNT", fieldName: "netSuiteIdCount", entityName: "co.hotwax.order.OrderIdentification",
                 filterByDate: "Y"]).create()
-        ec.entity.makeValue("moqui.rules.FactNodeCondition").setAll([factTypeId: currentIdsFactTypeId, nodeSeqId: "01",
+        ec.entity.makeValue("rules.FactNodeCondition").setAll([factTypeId: currentIdsFactTypeId, nodeSeqId: "01",
                 conditionSeqId: "01", entityFieldName: "orderId", operatorEnumId: "ENTCO_EQUALS", parameterName: "orderId"]).create()
-        ec.entity.makeValue("moqui.rules.FactNodeCondition").setAll([factTypeId: currentIdsFactTypeId, nodeSeqId: "01",
+        ec.entity.makeValue("rules.FactNodeCondition").setAll([factTypeId: currentIdsFactTypeId, nodeSeqId: "01",
                 conditionSeqId: "02", entityFieldName: "orderIdentificationTypeId", operatorEnumId: "ENTCO_EQUALS",
                 fixedValue: "NETSUITE_ORDER_ID"]).create()
     }
@@ -65,11 +65,11 @@ class BuildFactTests extends Specification {
 
     void removeTestFactType() {
         for (String factTypeId in [runningFactTypeId, refusedLogFactTypeId, brokenFactTypeId, currentIdsFactTypeId]) {
-            ec.entity.find("moqui.rules.FactNodeCondition").condition("factTypeId", factTypeId).deleteAll()
-            ec.entity.find("moqui.rules.FactNode").condition("factTypeId", factTypeId)
+            ec.entity.find("rules.FactNodeCondition").condition("factTypeId", factTypeId).deleteAll()
+            ec.entity.find("rules.FactNode").condition("factTypeId", factTypeId)
                     .condition("parentNodeSeqId", EntityCondition.ComparisonOperator.IS_NOT_NULL, null).deleteAll()
             for (String entityName in ["FactNode", "FactField", "FactType"])
-                ec.entity.find("moqui.rules." + entityName).condition("factTypeId", factTypeId).deleteAll()
+                ec.entity.find("rules." + entityName).condition("factTypeId", factTypeId).deleteAll()
         }
     }
 
@@ -194,7 +194,7 @@ class BuildFactTests extends Specification {
         EntityValue refusedLog = ec.entity.find("co.hotwax.datamanager.DataManagerLog")
                 .condition("failedRecordCount", EntityCondition.GREATER_THAN, 9).limit(1).list().getFirst()
         def builtFactCache = ec.cache.getCache("moqui.rules.built.fact")
-        EntityValue minimumCondition = ec.entity.find("moqui.rules.FactNodeCondition")
+        EntityValue minimumCondition = ec.entity.find("rules.FactNodeCondition")
                 .condition([factTypeId: refusedLogFactTypeId, nodeSeqId: "01", conditionSeqId: "02"]).useCache(false).one()
 
         when:

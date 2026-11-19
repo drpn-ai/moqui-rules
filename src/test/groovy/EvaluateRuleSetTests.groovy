@@ -10,7 +10,7 @@ class EvaluateRuleSetTests extends Specification {
     @Shared String groupRuleSetId = "RULES_TEST_GROUPS"
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeDecision(ruleSetId)
@@ -40,22 +40,22 @@ class EvaluateRuleSetTests extends Specification {
     }
 
     void createDecision(String id) {
-        ec.entity.makeValue("moqui.rules.RuleSet").setAll([ruleSetId: id, firstMatchOnly: "Y"]).create()
-        ec.entity.makeValue("moqui.rules.RuleSetFactType").setAll([ruleSetId: id, factTypeId: "checkResult"]).create()
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: id, firstMatchOnly: "Y"]).create()
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: id, factTypeId: "checkResult"]).create()
         for (String outcomeId in ["SWITCH_ON", "CHECK_AGAIN", "PUT_BACK"])
-            ec.entity.makeValue("moqui.rules.RuleSetOutcome").setAll([ruleSetId: id, outcomeId: outcomeId]).create()
+            ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: id, outcomeId: outcomeId]).create()
     }
 
     void removeDecision(String id) {
-        List<String> ruleIds = ec.entity.find("moqui.rules.RuleSetRule").condition("ruleSetId", id).list()*.ruleId
+        List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", id).list()*.ruleId
         if (ruleIds) {
-            ec.entity.find("moqui.rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
+            ec.entity.find("rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
                     .condition("parentConditionSeqId", EntityCondition.ComparisonOperator.IS_NOT_NULL, null).deleteAll()
             for (String entityName in ["RuleSetActionField", "RuleSetAction", "RuleSetCondition", "RuleSetRule"])
-                ec.entity.find("moqui.rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
+                ec.entity.find("rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
         }
         for (String entityName in ["RuleSetOutcome", "RuleSetFactType", "RuleSet"])
-            ec.entity.find("moqui.rules." + entityName).condition("ruleSetId", id).deleteAll()
+            ec.entity.find("rules." + entityName).condition("ruleSetId", id).deleteAll()
     }
 
     static Map compare(String seqId, String fieldName, String operatorEnumId, String compareValue) {
@@ -125,16 +125,16 @@ class EvaluateRuleSetTests extends Specification {
 
     def "a rule line changed or removed outside store#Rule is used on the next call"() {
         given:
-        String switchOnRuleId = ec.entity.find("moqui.rules.RuleSetRule").condition([ruleSetId: ruleSetId, ruleName: "switch on"])
+        String switchOnRuleId = ec.entity.find("rules.RuleSetRule").condition([ruleSetId: ruleSetId, ruleName: "switch on"])
                 .one().ruleId
         Map oneRefused = [refusedCount: 1, logStatusId: "DmlsFinished", tryCount: 1]
         Map twoRefused = [refusedCount: 2, logStatusId: "DmlsFinished", tryCount: 1]
 
         when:
-        ec.entity.find("moqui.rules.RuleSetCondition").condition([ruleId: switchOnRuleId, conditionSeqId: "01"]).one()
+        ec.entity.find("rules.RuleSetCondition").condition([ruleId: switchOnRuleId, conditionSeqId: "01"]).one()
                 .setAll([operatorEnumId: "ENTCO_EQUALS", compareValue: "0"]).update()
         Map afterChange = evaluate(ruleSetId, oneRefused)
-        ec.entity.find("moqui.rules.RuleSetCondition").condition([ruleId: switchOnRuleId, conditionSeqId: "01"]).one().delete()
+        ec.entity.find("rules.RuleSetCondition").condition([ruleId: switchOnRuleId, conditionSeqId: "01"]).one().delete()
         Map afterRemove = evaluate(ruleSetId, twoRefused)
 
         then:

@@ -16,19 +16,19 @@
     <moqui.basic.Enumeration enumTypeId="FactNodeType" enumId="FNT_AGE" enumCode="age" description="Count Whole Days Since a Date" sequenceNum="5"/>
 
 
-    <moqui.rules.RuleConditionType conditionTypeId="RCT_COMPARE" description="Compare a Field"
+    <rules.RuleConditionType conditionTypeId="RCT_COMPARE" description="Compare a Field"
             prepareServiceName="moqui.rules.RuleLineServices.prepare#CompareLine"/>
-    <moqui.rules.RuleConditionType conditionTypeId="RCT_ALL" description="All Lines Match"
+    <rules.RuleConditionType conditionTypeId="RCT_ALL" description="All Lines Match"
             prepareServiceName="moqui.rules.RuleLineServices.prepare#AllLine"/>
-    <moqui.rules.RuleConditionType conditionTypeId="RCT_ANY" description="Any Line Matches"
+    <rules.RuleConditionType conditionTypeId="RCT_ANY" description="Any Line Matches"
             prepareServiceName="moqui.rules.RuleLineServices.prepare#AnyLine"/>
-    <moqui.rules.RuleConditionType conditionTypeId="RCT_NOT" description="No Line Matches"
+    <rules.RuleConditionType conditionTypeId="RCT_NOT" description="No Line Matches"
             prepareServiceName="moqui.rules.RuleLineServices.prepare#NotLine"/>
-    <moqui.rules.RuleConditionType conditionTypeId="RCT_EXISTS" description="One List Item Matches"
+    <rules.RuleConditionType conditionTypeId="RCT_EXISTS" description="One List Item Matches"
             prepareServiceName="moqui.rules.RuleLineServices.prepare#ExistsLine"/>
 
-    <moqui.rules.RuleActionType actionTypeId="RAT_OUTCOME" description="Return an Outcome"
+    <rules.RuleActionType actionTypeId="RAT_OUTCOME" description="Return an Outcome"
             prepareServiceName="moqui.rules.RuleActionServices.prepare#OutcomeAction"/>
-    <moqui.rules.RuleActionType actionTypeId="RAT_ADD_FACT" description="Add a Fact"
+    <rules.RuleActionType actionTypeId="RAT_ADD_FACT" description="Add a Fact"
             prepareServiceName="moqui.rules.RuleActionServices.prepare#AddFactAction"/>
 </entity-facade-xml>

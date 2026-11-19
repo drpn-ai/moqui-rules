@@ -38,7 +38,7 @@ class RuleSets {
         try {
             ec.artifactExecution.disableAuthz()
             long startTime = System.currentTimeMillis()
-            List<String> ruleSetIds = ec.entity.find("moqui.rules.RuleSet").list()*.ruleSetId
+            List<String> ruleSetIds = ec.entity.find("rules.RuleSet").list()*.ruleSetId
             int builtCount = 0
             for (String ruleSetId in ruleSetIds) {
                 try {

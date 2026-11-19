@@ -9,16 +9,16 @@ class CheckFileTests extends Specification {
     @Shared String refundsCsv = "orderId,amount,reason\n100234,25.00,damaged\n100235,40.50,late\n"
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeTestData()
         callService("learn#FileFields", [factTypeId: factTypeId, fileName: "refunds.csv", fileText: refundsCsv])
         callService("update#FactField", [factTypeId: factTypeId, fieldName: "orderId", valueTypeEnumId: "FVT_TEXT"])
-        ec.entity.makeValue("moqui.rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "Y"]).create()
-        ec.entity.makeValue("moqui.rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "Y"]).create()
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
         for (String outcomeId in ["REVIEW", "PAY"])
-            ec.entity.makeValue("moqui.rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: outcomeId]).create()
+            ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: outcomeId]).create()
         callService("store#Rule", [ruleSetId: ruleSetId, ruleName: "big refund", priority: 20,
                 conditions: [[conditionSeqId: "01", conditionTypeId: "RCT_COMPARE", factTypeId: factTypeId,
                         fieldName: "amount", operatorEnumId: "ENTCO_GREATER", compareValue: "30"]],
@@ -35,20 +35,20 @@ class CheckFileTests extends Specification {
     }
 
     void removeTestData() {
-        List<String> fileCheckIds = ec.entity.find("moqui.rules.FileCheck").condition("ruleSetId", ruleSetId).list()*.fileCheckId
+        List<String> fileCheckIds = ec.entity.find("rules.FileCheck").condition("ruleSetId", ruleSetId).list()*.fileCheckId
         if (fileCheckIds) {
-            ec.entity.find("moqui.rules.FileCheckRecord").condition("fileCheckId", "in", fileCheckIds).deleteAll()
-            ec.entity.find("moqui.rules.FileCheck").condition("fileCheckId", "in", fileCheckIds).deleteAll()
+            ec.entity.find("rules.FileCheckRecord").condition("fileCheckId", "in", fileCheckIds).deleteAll()
+            ec.entity.find("rules.FileCheck").condition("fileCheckId", "in", fileCheckIds).deleteAll()
         }
-        List<String> ruleIds = ec.entity.find("moqui.rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
+        List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
         if (ruleIds) {
             for (String entityName in ["RuleSetAction", "RuleSetCondition", "RuleSetRule"])
-                ec.entity.find("moqui.rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
+                ec.entity.find("rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
         }
         for (String entityName in ["RuleSetOutcome", "RuleSetFactType", "RuleSet"])
-            ec.entity.find("moqui.rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
-        ec.entity.find("moqui.rules.FactField").condition("factTypeId", factTypeId).deleteAll()
-        ec.entity.find("moqui.rules.FactType").condition("factTypeId", factTypeId).deleteAll()
+            ec.entity.find("rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
+        ec.entity.find("rules.FactField").condition("factTypeId", factTypeId).deleteAll()
+        ec.entity.find("rules.FactType").condition("factTypeId", factTypeId).deleteAll()
     }
 
     Map callService(String serviceName, Map parameters) {

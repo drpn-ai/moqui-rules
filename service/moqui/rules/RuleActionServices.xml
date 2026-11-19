@@ -22,7 +22,7 @@
         <implements service="moqui.rules.RuleActionServices.prepare#RuleAction"/>
         <actions>
             <set field="problems" from="[]"/>
-            <entity-find-one entity-name="moqui.rules.RuleSetOutcome" value-field="ruleSetOutcome">
+            <entity-find-one entity-name="rules.RuleSetOutcome" value-field="ruleSetOutcome">
                 <field-map field-name="ruleSetId"/><field-map field-name="outcomeId" from="action.outcomeId"/></entity-find-one>
             <if condition="ruleSetOutcome == null">
                 <script>problems.add("outcome ${action.outcomeId} is not in the list of decision ${ruleSetId}".toString())</script>
@@ -46,7 +46,7 @@
             <set field="values" from="[:]"/>
             <set field="actionFields" from="action.fields ?: []"/>
             <iterate list="actionFields" entry="actionField">
-                <entity-find-one entity-name="moqui.rules.FactField" value-field="factField">
+                <entity-find-one entity-name="rules.FactField" value-field="factField">
                     <field-map field-name="factTypeId" from="action.factTypeId"/>
                     <field-map field-name="fieldName" from="actionField.fieldName"/></entity-find-one>
                 <if condition="factField == null">

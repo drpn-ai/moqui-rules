@@ -12,7 +12,7 @@ class FactTreeRefusalTests extends Specification {
             "RULES_TEST_AGE_NOT_INTEGER"]
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeTestFactTypes()
@@ -78,15 +78,15 @@ class FactTreeRefusalTests extends Specification {
     }
 
     void create(String entityName, Map values) {
-        ec.entity.makeValue("moqui.rules." + entityName).setAll(values).create()
+        ec.entity.makeValue("rules." + entityName).setAll(values).create()
     }
 
     void removeTestFactTypes() {
-        ec.entity.find("moqui.rules.FactNodeCondition").condition("factTypeId", "in", testFactTypeIds).deleteAll()
-        ec.entity.find("moqui.rules.FactNode").condition("factTypeId", "in", testFactTypeIds)
+        ec.entity.find("rules.FactNodeCondition").condition("factTypeId", "in", testFactTypeIds).deleteAll()
+        ec.entity.find("rules.FactNode").condition("factTypeId", "in", testFactTypeIds)
                 .condition("parentNodeSeqId", EntityCondition.ComparisonOperator.IS_NOT_NULL, null).deleteAll()
         for (String entityName in ["FactNode", "FactField", "FactType"])
-            ec.entity.find("moqui.rules." + entityName).condition("factTypeId", "in", testFactTypeIds).deleteAll()
+            ec.entity.find("rules." + entityName).condition("factTypeId", "in", testFactTypeIds).deleteAll()
     }
 
     Map buildFact(String factTypeId) {

@@ -32,7 +32,7 @@ class RuleSetBuilder {
         ((List<String>) decisionFactTypes.factTypeIds).each { prototypes.put(it, PrototypeDSL.prototypeFact(it)) }
 
         ModelImpl model = new ModelImpl().addGlobal(matches)
-        List<Map> rules = ec.entity.find("moqui.rules.RuleSetRule").condition("ruleSetId", ruleSetId)
+        List<Map> rules = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId)
                 .useCache(false).disableAuthz().listMaster("default")
         for (Map rule in rules) model.addRule(buildRule(rule))
         return new BuiltRuleSet(ruleSetId, KieBaseBuilder.createKieBaseFromModel(model), prototypes)

@@ -16,7 +16,7 @@ class FactActions {
         } finally {
             ec.context.pop()
         }
-        return new XmlAction((ExecutionContextFactoryImpl) ec.factory, actionsText.toString(), "moqui.rules.FactType." + factTypeId)
+        return new XmlAction((ExecutionContextFactoryImpl) ec.factory, actionsText.toString(), "rules.FactType." + factTypeId)
     }
 
     static Map run(ExecutionContext ec, Map builtFact, Map parameters) {

@@ -44,7 +44,7 @@
             <set field="childrenFirst" from="walkOrder.reverse()"/>
             <iterate list="childrenFirst" entry="row">
                 <set field="childLines" from="(rowsByParent.get(row.conditionSeqId) ?: []).collect { preparedBySeqId.get(it.conditionSeqId) }"/>
-                <entity-find-one entity-name="moqui.rules.RuleConditionType" value-field="conditionType">
+                <entity-find-one entity-name="rules.RuleConditionType" value-field="conditionType">
                     <field-map field-name="conditionTypeId" from="row.conditionTypeId"/></entity-find-one>
                 <if condition="conditionType == null">
                     <set field="prepared" from="[problems: ['condition type ' + row.conditionTypeId + ' is not known'], factTypeIds: []]"/>
@@ -116,7 +116,7 @@
 
             <if condition="childLines">
                 <script>problems.add("a compare line takes no lines under it")</script></if>
-            <entity-find-one entity-name="moqui.rules.FactField" value-field="factField">
+            <entity-find-one entity-name="rules.FactField" value-field="factField">
                 <field-map field-name="factTypeId" from="line.factTypeId"/>
                 <field-map field-name="fieldName" from="line.fieldName"/></entity-find-one>
             <if condition="factField == null || !(line.factTypeId in readFactTypeIds)">
@@ -233,7 +233,7 @@
         <actions>
             <set field="problems" from="[]"/>
             <set field="factTypeIds" from="[line.factTypeId]"/>
-            <entity-find-one entity-name="moqui.rules.FactField" value-field="factField">
+            <entity-find-one entity-name="rules.FactField" value-field="factField">
                 <field-map field-name="factTypeId" from="line.factTypeId"/>
                 <field-map field-name="fieldName" from="line.fieldName"/></entity-find-one>
             <if condition="factField == null || factField.valueTypeEnumId != 'FVT_LIST' || !(line.factTypeId in readFactTypeIds)">

@@ -10,7 +10,7 @@ class ListFactTests extends Specification {
     @Shared String plainOrderId
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         digitalOrderId = salesOrderIdWhere(true)
@@ -131,6 +131,6 @@ class ListFactTests extends Specification {
 
         then:
         errors.any { it.contains("orderItem is a list item type, so its lines must sit under an exists line") }
-        ec.entity.find("moqui.rules.RuleSetRule").condition("ruleSetId", "HAS_DIGITAL_GOOD").condition("ruleName", "loose item line").count() == 0
+        ec.entity.find("rules.RuleSetRule").condition("ruleSetId", "HAS_DIGITAL_GOOD").condition("ruleName", "loose item line").count() == 0
     }
 }

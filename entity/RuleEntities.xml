@@ -2,33 +2,33 @@
 <entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
 
-    <entity entity-name="FactType" package="moqui.rules" use="configuration" cache="true">
+    <entity entity-name="FactType" package="rules" use="configuration" cache="true">
         <description>One kind of fact that rules read, like checkResult or salesOrder.</description>
         <field name="factTypeId" type="id" is-pk="true"/>
         <field name="description" type="text-medium"/>
-        <relationship type="many" related="moqui.rules.FactField" short-alias="fields"><key-map field-name="factTypeId"/></relationship>
-        <relationship type="many" related="moqui.rules.FactNode" short-alias="nodes"><key-map field-name="factTypeId"/></relationship>
+        <relationship type="many" related="rules.FactField" short-alias="fields"><key-map field-name="factTypeId"/></relationship>
+        <relationship type="many" related="rules.FactNode" short-alias="nodes"><key-map field-name="factTypeId"/></relationship>
         <master>
             <detail relationship="fields"/>
             <detail relationship="nodes"><detail relationship="conditions"/></detail>
         </master>
     </entity>
 
-    <entity entity-name="FactField" package="moqui.rules" use="configuration" cache="true">
+    <entity entity-name="FactField" package="rules" use="configuration" cache="true">
         <description>One value in a fact, with its type. Rules are checked against these fields.</description>
         <field name="factTypeId" type="id" is-pk="true"/>
         <field name="fieldName" type="id" is-pk="true"/>
         <field name="valueTypeEnumId" type="id"/>
         <field name="itemFactTypeId" type="id"><description>For a list field, the fact type of each item.</description></field>
         <field name="description" type="text-medium"/>
-        <relationship type="one" related="moqui.rules.FactType"/>
+        <relationship type="one" related="rules.FactType"/>
         <relationship type="one" title="FactValueType" related="moqui.basic.Enumeration" short-alias="valueType">
             <key-map field-name="valueTypeEnumId" related="enumId"/></relationship>
-        <relationship type="one" title="Item" related="moqui.rules.FactType" short-alias="itemFactType">
+        <relationship type="one" title="Item" related="rules.FactType" short-alias="itemFactType">
             <key-map field-name="itemFactTypeId" related="factTypeId"/></relationship>
     </entity>
 
-    <entity entity-name="FactNode" package="moqui.rules" use="configuration" cache="true">
+    <entity entity-name="FactNode" package="rules" use="configuration" cache="true">
         <description>One step of the tree that builds a fact from entity data.</description>
         <field name="factTypeId" type="id" is-pk="true"/>
         <field name="nodeSeqId" type="id" is-pk="true"/>
@@ -43,18 +43,18 @@
         <field name="parameterName" type="text-short"><description>The caller value a value node reads.</description></field>
         <field name="filterByDate" type="text-indicator"><description>Y makes a record, list or count node read only the rows
             current now: fromDate empty or not after now, and thruDate empty or after now.</description></field>
-        <relationship type="one" related="moqui.rules.FactType"/>
-        <relationship type="one" title="Parent" related="moqui.rules.FactNode" short-alias="parent">
+        <relationship type="one" related="rules.FactType"/>
+        <relationship type="one" title="Parent" related="rules.FactNode" short-alias="parent">
             <key-map field-name="factTypeId"/><key-map field-name="parentNodeSeqId" related="nodeSeqId"/></relationship>
-        <relationship type="one" related="moqui.rules.FactField" short-alias="field">
+        <relationship type="one" related="rules.FactField" short-alias="field">
             <key-map field-name="factTypeId"/><key-map field-name="fieldName"/></relationship>
         <relationship type="one" title="FactNodeType" related="moqui.basic.Enumeration" short-alias="nodeType">
             <key-map field-name="nodeTypeEnumId" related="enumId"/></relationship>
-        <relationship type="many" related="moqui.rules.FactNodeCondition" short-alias="conditions">
+        <relationship type="many" related="rules.FactNodeCondition" short-alias="conditions">
             <key-map field-name="factTypeId"/><key-map field-name="nodeSeqId"/></relationship>
     </entity>
 
-    <entity entity-name="FactNodeCondition" package="moqui.rules" use="configuration" cache="true">
+    <entity entity-name="FactNodeCondition" package="rules" use="configuration" cache="true">
         <description>Says which rows a record, list or count node reads.</description>
         <field name="factTypeId" type="id" is-pk="true"/>
         <field name="nodeSeqId" type="id" is-pk="true"/>
@@ -63,39 +63,39 @@
         <field name="operatorEnumId" type="id"/>
         <field name="fixedValue" type="text-medium"/>
         <field name="parameterName" type="text-short"><description>The caller value to compare with. Used when fixedValue is empty.</description></field>
-        <relationship type="one" related="moqui.rules.FactNode">
+        <relationship type="one" related="rules.FactNode">
             <key-map field-name="factTypeId"/><key-map field-name="nodeSeqId"/></relationship>
         <relationship type="one" title="ComparisonOperator" related="moqui.basic.Enumeration" short-alias="operator">
             <key-map field-name="operatorEnumId" related="enumId"/></relationship>
     </entity>
 
-    <entity entity-name="RuleSet" package="moqui.rules" use="configuration">
+    <entity entity-name="RuleSet" package="rules" use="configuration">
         <description>One decision, like SWITCH_ON_A_JOB.</description>
         <field name="ruleSetId" type="id" is-pk="true"/>
         <field name="description" type="text-medium" enable-audit-log="true"/>
         <field name="firstMatchOnly" type="text-indicator" enable-audit-log="true"><description>Y returns only the outcome of the highest priority rule that matches.</description></field>
-        <relationship type="many" related="moqui.rules.RuleSetFactType" short-alias="factTypes"><key-map field-name="ruleSetId"/></relationship>
-        <relationship type="many" related="moqui.rules.RuleSetOutcome" short-alias="outcomes"><key-map field-name="ruleSetId"/></relationship>
-        <relationship type="many" related="moqui.rules.RuleSetRule" short-alias="rules"><key-map field-name="ruleSetId"/></relationship>
+        <relationship type="many" related="rules.RuleSetFactType" short-alias="factTypes"><key-map field-name="ruleSetId"/></relationship>
+        <relationship type="many" related="rules.RuleSetOutcome" short-alias="outcomes"><key-map field-name="ruleSetId"/></relationship>
+        <relationship type="many" related="rules.RuleSetRule" short-alias="rules"><key-map field-name="ruleSetId"/></relationship>
     </entity>
 
-    <entity entity-name="RuleSetFactType" package="moqui.rules" use="configuration">
+    <entity entity-name="RuleSetFactType" package="rules" use="configuration">
         <description>A fact type a decision reads.</description>
         <field name="ruleSetId" type="id" is-pk="true"/>
         <field name="factTypeId" type="id" is-pk="true"/>
-        <relationship type="one" related="moqui.rules.RuleSet"/>
-        <relationship type="one" related="moqui.rules.FactType"/>
+        <relationship type="one" related="rules.RuleSet"/>
+        <relationship type="one" related="rules.FactType"/>
     </entity>
 
-    <entity entity-name="RuleSetOutcome" package="moqui.rules" use="configuration">
+    <entity entity-name="RuleSetOutcome" package="rules" use="configuration">
         <description>One result in the fixed list a decision can give.</description>
         <field name="ruleSetId" type="id" is-pk="true"/>
         <field name="outcomeId" type="id" is-pk="true"/>
         <field name="description" type="text-medium" enable-audit-log="true"/>
-        <relationship type="one" related="moqui.rules.RuleSet"/>
+        <relationship type="one" related="rules.RuleSet"/>
     </entity>
 
-    <entity entity-name="RuleSetRule" package="moqui.rules" use="configuration">
+    <entity entity-name="RuleSetRule" package="rules" use="configuration">
         <description>One rule of a decision. A change edits it in place; the entity audit log keeps the old values.</description>
         <field name="ruleId" type="id" is-pk="true"/>
         <field name="ruleSetId" type="id" enable-audit-log="true"/>
@@ -103,9 +103,9 @@
         <field name="priority" type="number-integer" enable-audit-log="true"/>
         <field name="description" type="text-medium" enable-audit-log="true"/>
         <field name="changedDate" type="date-time" enable-audit-log="true"><description>When store#Rule last recorded a change to the rule or its lines.</description></field>
-        <relationship type="one" related="moqui.rules.RuleSet"/>
-        <relationship type="many" related="moqui.rules.RuleSetCondition" short-alias="conditions"><key-map field-name="ruleId"/></relationship>
-        <relationship type="many" related="moqui.rules.RuleSetAction" short-alias="actions"><key-map field-name="ruleId"/></relationship>
+        <relationship type="one" related="rules.RuleSet"/>
+        <relationship type="many" related="rules.RuleSetCondition" short-alias="conditions"><key-map field-name="ruleId"/></relationship>
+        <relationship type="many" related="rules.RuleSetAction" short-alias="actions"><key-map field-name="ruleId"/></relationship>
         <index name="RULE_SET_RULE_NAME" unique="true"><index-field name="ruleSetId"/><index-field name="ruleName"/></index>
         <index name="RULE_SET_RULE_PRIORITY" unique="true"><index-field name="ruleSetId"/><index-field name="priority"/></index>
         <master>
@@ -114,7 +114,7 @@
         </master>
     </entity>
 
-    <entity entity-name="RuleConditionType" package="moqui.rules" use="configuration" cache="true">
+    <entity entity-name="RuleConditionType" package="rules" use="configuration" cache="true">
         <description>One kind of "when" line, like compare a field or all lines match, with the service that checks a line of
             this kind and turns it into a Moqui condition.</description>
         <field name="conditionTypeId" type="id" is-pk="true"/>
@@ -122,7 +122,7 @@
         <field name="prepareServiceName" type="text-medium"><description>Implements moqui.rules.RuleLineServices.prepare#RuleLine.</description></field>
     </entity>
 
-    <entity entity-name="RuleSetCondition" package="moqui.rules" use="configuration">
+    <entity entity-name="RuleSetCondition" package="rules" use="configuration">
         <description>One "when" line of a rule.</description>
         <field name="ruleId" type="id" is-pk="true"/>
         <field name="conditionSeqId" type="id" is-pk="true"/>
@@ -133,25 +133,25 @@
         <field name="fieldName" type="id" enable-audit-log="true"/>
         <field name="operatorEnumId" type="id" enable-audit-log="true"/>
         <field name="compareValue" type="text-medium" enable-audit-log="true"/>
-        <relationship type="one" related="moqui.rules.RuleSetRule"/>
-        <relationship type="one" title="Parent" related="moqui.rules.RuleSetCondition" short-alias="parent">
+        <relationship type="one" related="rules.RuleSetRule"/>
+        <relationship type="one" title="Parent" related="rules.RuleSetCondition" short-alias="parent">
             <key-map field-name="ruleId"/><key-map field-name="parentConditionSeqId" related="conditionSeqId"/></relationship>
-        <relationship type="one" related="moqui.rules.FactField" short-alias="field">
+        <relationship type="one" related="rules.FactField" short-alias="field">
             <key-map field-name="factTypeId"/><key-map field-name="fieldName"/></relationship>
-        <relationship type="one" related="moqui.rules.RuleConditionType" short-alias="conditionType"/>
+        <relationship type="one" related="rules.RuleConditionType" short-alias="conditionType"/>
         <relationship type="one" title="ComparisonOperator" related="moqui.basic.Enumeration" short-alias="operator">
             <key-map field-name="operatorEnumId" related="enumId"/></relationship>
     </entity>
-    <view-entity entity-name="RuleSetConditionAndRule" package="moqui.rules">
+    <view-entity entity-name="RuleSetConditionAndRule" package="rules">
         <description>Each rule line with the name of its rule, to find every rule that compares a field.</description>
-        <member-entity entity-alias="RSC" entity-name="moqui.rules.RuleSetCondition"/>
-        <member-entity entity-alias="RSR" entity-name="moqui.rules.RuleSetRule" join-from-alias="RSC">
+        <member-entity entity-alias="RSC" entity-name="rules.RuleSetCondition"/>
+        <member-entity entity-alias="RSR" entity-name="rules.RuleSetRule" join-from-alias="RSC">
             <key-map field-name="ruleId"/></member-entity>
         <alias-all entity-alias="RSC"/>
         <alias name="ruleName" entity-alias="RSR"/>
     </view-entity>
 
-    <entity entity-name="RuleActionType" package="moqui.rules" use="configuration" cache="true">
+    <entity entity-name="RuleActionType" package="rules" use="configuration" cache="true">
         <description>One kind of "then" part, like return an outcome or add a fact, with the service that checks an action of
             this kind and gives what the decision needs from it.</description>
         <field name="actionTypeId" type="id" is-pk="true"/>
@@ -159,7 +159,7 @@
         <field name="prepareServiceName" type="text-medium"><description>Implements moqui.rules.RuleActionServices.prepare#RuleAction.</description></field>
     </entity>
 
-    <entity entity-name="RuleSetAction" package="moqui.rules" use="configuration">
+    <entity entity-name="RuleSetAction" package="rules" use="configuration">
         <description>The "then" part of a rule: return an outcome, or add a new fact.</description>
         <field name="ruleId" type="id" is-pk="true"/>
         <field name="actionSeqId" type="id" is-pk="true"/>
@@ -167,25 +167,25 @@
         <field name="actionTypeId" type="id" enable-audit-log="true"/>
         <field name="outcomeId" type="id" enable-audit-log="true"/>
         <field name="factTypeId" type="id" enable-audit-log="true"><description>The fact type an add fact action creates.</description></field>
-        <relationship type="one" related="moqui.rules.RuleSetRule"/>
-        <relationship type="one" related="moqui.rules.RuleSetOutcome" short-alias="outcome">
+        <relationship type="one" related="rules.RuleSetRule"/>
+        <relationship type="one" related="rules.RuleSetOutcome" short-alias="outcome">
             <key-map field-name="ruleSetId"/><key-map field-name="outcomeId"/></relationship>
-        <relationship type="one" related="moqui.rules.FactType"/>
-        <relationship type="one" related="moqui.rules.RuleActionType" short-alias="actionType"/>
-        <relationship type="many" related="moqui.rules.RuleSetActionField" short-alias="fields">
+        <relationship type="one" related="rules.FactType"/>
+        <relationship type="one" related="rules.RuleActionType" short-alias="actionType"/>
+        <relationship type="many" related="rules.RuleSetActionField" short-alias="fields">
             <key-map field-name="ruleId"/><key-map field-name="actionSeqId"/></relationship>
     </entity>
 
-    <entity entity-name="RuleSetActionField" package="moqui.rules" use="configuration">
+    <entity entity-name="RuleSetActionField" package="rules" use="configuration">
         <description>One value of the new fact an action adds.</description>
         <field name="ruleId" type="id" is-pk="true"/>
         <field name="actionSeqId" type="id" is-pk="true"/>
         <field name="fieldName" type="id" is-pk="true"/>
         <field name="fixedValue" type="text-medium" enable-audit-log="true"/>
-        <relationship type="one" related="moqui.rules.RuleSetAction">
+        <relationship type="one" related="rules.RuleSetAction">
             <key-map field-name="ruleId"/><key-map field-name="actionSeqId"/></relationship>
     </entity>
-    <entity entity-name="FileCheck" package="moqui.rules" use="transactional">
+    <entity entity-name="FileCheck" package="rules" use="transactional">
         <description>One check of a file against a decision, kept so the Rule Author can review or download its outcomes.</description>
         <field name="fileCheckId" type="id" is-pk="true"/>
         <field name="ruleSetId" type="id"/>
@@ -195,20 +195,20 @@
         <field name="checkedByUserId" type="id"/>
         <field name="recordCount" type="number-integer"/>
         <field name="refusedCount" type="number-integer"/>
-        <relationship type="one" related="moqui.rules.RuleSet"/>
-        <relationship type="one" related="moqui.rules.FactType"/>
+        <relationship type="one" related="rules.RuleSet"/>
+        <relationship type="one" related="rules.FactType"/>
         <relationship type="one" title="CheckedBy" related="moqui.security.UserAccount" short-alias="checkedBy">
             <key-map field-name="checkedByUserId" related="userId"/></relationship>
-        <relationship type="many" related="moqui.rules.FileCheckRecord" short-alias="records"><key-map field-name="fileCheckId"/></relationship>
+        <relationship type="many" related="rules.FileCheckRecord" short-alias="records"><key-map field-name="fileCheckId"/></relationship>
     </entity>
 
-    <entity entity-name="FileCheckRecord" package="moqui.rules" use="transactional">
+    <entity entity-name="FileCheckRecord" package="rules" use="transactional">
         <description>One record of a checked file, with its outcomes or the reasons it was refused.</description>
         <field name="fileCheckId" type="id" is-pk="true"/>
         <field name="recordNumber" type="number-integer" is-pk="true"/>
         <field name="recordValues" type="text-very-long"><description>The record's values as a JSON object.</description></field>
         <field name="outcomes" type="text-medium"><description>The outcome ids as a JSON list. Empty when the record was refused.</description></field>
         <field name="refusedReasons" type="text-very-long"><description>Why the record was refused, as a JSON list.</description></field>
-        <relationship type="one" related="moqui.rules.FileCheck"/>
+        <relationship type="one" related="rules.FileCheck"/>
     </entity>
 </entities>

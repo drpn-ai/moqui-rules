@@ -9,14 +9,14 @@ class StoreRuleTests extends Specification {
     @Shared String ruleSetId = "RULES_TEST_SWITCH_ON"
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeTestDecision()
-        ec.entity.makeValue("moqui.rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "Y"]).create()
-        ec.entity.makeValue("moqui.rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: "checkResult"]).create()
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "Y"]).create()
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: "checkResult"]).create()
         for (String outcomeId in ["SWITCH_ON", "CHECK_AGAIN", "PUT_BACK"])
-            ec.entity.makeValue("moqui.rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: outcomeId]).create()
+            ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: outcomeId]).create()
     }
 
     def cleanupSpec() {
@@ -27,15 +27,15 @@ class StoreRuleTests extends Specification {
     }
 
     void removeTestDecision() {
-        List<String> ruleIds = ec.entity.find("moqui.rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
+        List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
         if (ruleIds) {
-            ec.entity.find("moqui.rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
+            ec.entity.find("rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
                     .condition("parentConditionSeqId", EntityCondition.ComparisonOperator.IS_NOT_NULL, null).deleteAll()
             for (String entityName in ["RuleSetActionField", "RuleSetAction", "RuleSetCondition", "RuleSetRule"])
-                ec.entity.find("moqui.rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
+                ec.entity.find("rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
         }
         for (String entityName in ["RuleSetOutcome", "RuleSetFactType", "RuleSet"])
-            ec.entity.find("moqui.rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
+            ec.entity.find("rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
     }
 
     Map storeSwitchOn(List<Map> conditions, Integer priority = 30, String outcomeId = "SWITCH_ON") {
@@ -54,16 +54,16 @@ class StoreRuleTests extends Specification {
     }
 
     List<EntityValue> switchOnRules() {
-        ec.entity.find("moqui.rules.RuleSetRule").condition("ruleSetId", ruleSetId).condition("ruleName", "switch on")
+        ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId).condition("ruleName", "switch on")
                 .useCache(false).list()
     }
 
     List<EntityValue> switchOnLines() {
-        ec.entity.find("moqui.rules.RuleSetCondition").condition("ruleId", switchOnRules()[0].ruleId).useCache(false).list()
+        ec.entity.find("rules.RuleSetCondition").condition("ruleId", switchOnRules()[0].ruleId).useCache(false).list()
     }
 
     List<EntityValue> auditOf(String fieldName) {
-        ec.entity.find("moqui.entity.EntityAuditLog").condition("changedEntityName", "moqui.rules.RuleSetCondition")
+        ec.entity.find("moqui.entity.EntityAuditLog").condition("changedEntityName", "rules.RuleSetCondition")
                 .condition("changedFieldName", fieldName).condition("pkPrimaryValue", switchOnRules()[0].ruleId)
                 .orderBy("changedDate").useCache(false).list()
     }
@@ -198,16 +198,16 @@ class StoreRuleTests extends Specification {
         then:
         errors.containsAll(["Action 1: outcome SWITCH_ONN is not in the list of decision ${ruleSetId}".toString(),
                 "Action 2: value abc does not fit field tryCount", "Action 3: action type RAT_SOMETIMES is not known"])
-        ec.entity.find("moqui.rules.RuleSetRule").condition([ruleSetId: ruleSetId, ruleName: "grouped"]).count() == 0
+        ec.entity.find("rules.RuleSetRule").condition([ruleSetId: ruleSetId, ruleName: "grouped"]).count() == 0
     }
 
     def "an edit can turn a line into a group, add lines under it, and change, add and remove actions"() {
         given:
         storeGrouped([compareLine("01", "refusedCount", "0")],
                 [[actionTypeId: "RAT_OUTCOME", outcomeId: "SWITCH_ON"], addFactAction([tryCount: "2", logStatusId: "DmlsFinished"])])
-        String ruleId = ec.entity.find("moqui.rules.RuleSetRule").condition([ruleSetId: ruleSetId, ruleName: "grouped"]).one().ruleId
+        String ruleId = ec.entity.find("rules.RuleSetRule").condition([ruleSetId: ruleSetId, ruleName: "grouped"]).one().ruleId
         Closure<List<EntityValue>> rowsOf = { String entityName ->
-            ec.entity.find("moqui.rules." + entityName).condition("ruleId", ruleId).useCache(false).list()
+            ec.entity.find("rules." + entityName).condition("ruleId", ruleId).useCache(false).list()
         }
         List<String> firstActionSeqIds = rowsOf("RuleSetAction")*.actionSeqId.sort()
 

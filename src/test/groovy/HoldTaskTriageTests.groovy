@@ -12,7 +12,7 @@ class HoldTaskTriageTests extends Specification {
             ORD_HOLD_CUST_REQ: "PURPOSE_OWNER", ORD_HOLD_MANUAL: "PURPOSE_OWNER", ORD_HOLD_FUTURE_INV: "PURPOSE_OWNER"]
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
     }

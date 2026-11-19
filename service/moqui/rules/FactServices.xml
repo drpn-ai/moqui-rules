@@ -34,17 +34,17 @@
             <while condition="waiting">
                 <set field="entry" from="waiting.remove(0)"/>
                 <if condition="entry.row == null">
-                    <entity-find-one entity-name="moqui.rules.FactType" value-field="factType">
+                    <entity-find-one entity-name="rules.FactType" value-field="factType">
                         <field-map field-name="factTypeId" from="entry.factTypeId"/></entity-find-one>
                     <if condition="factType == null">
                         <script>problems.add("Fact type ${entry.factTypeId} does not exist".toString())</script>
                         <continue/>
                     </if>
-                    <entity-find entity-name="moqui.rules.FactField" list="factFields">
+                    <entity-find entity-name="rules.FactField" list="factFields">
                         <econdition field-name="factTypeId" from="entry.factTypeId"/></entity-find>
-                    <entity-find entity-name="moqui.rules.FactNode" list="nodeRows">
+                    <entity-find entity-name="rules.FactNode" list="nodeRows">
                         <econdition field-name="factTypeId" from="entry.factTypeId"/><order-by field-name="sequenceNum"/></entity-find>
-                    <entity-find entity-name="moqui.rules.FactNodeCondition" list="conditionRows">
+                    <entity-find entity-name="rules.FactNodeCondition" list="conditionRows">
                         <econdition field-name="factTypeId" from="entry.factTypeId"/><order-by field-name="conditionSeqId"/></entity-find>
                     <set field="tree" from="[fieldsByName: factFields.collectEntries { [(it.fieldName): it] },
                             rowsByParent: nodeRows.groupBy { it.parentNodeSeqId }, conditionsByNode: conditionRows.groupBy { it.nodeSeqId }]"/>

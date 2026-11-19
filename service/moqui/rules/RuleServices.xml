@@ -24,7 +24,7 @@
             <parameter name="ruleId"/>
         </out-parameters>
         <actions>
-            <entity-find-one entity-name="moqui.rules.RuleSet" value-field="ruleSet"/>
+            <entity-find-one entity-name="rules.RuleSet" value-field="ruleSet"/>
             <if condition="ruleSet == null"><return error="true" message="Decision ${ruleSetId} does not exist"/></if>
 
             <service-call name="moqui.rules.RuleLineServices.prepare#RuleLines" out-map="preparedLines"
@@ -32,7 +32,7 @@
             <set field="problems" from="[] + preparedLines.problems"/>
             <if condition="!actions"><script>problems.add("A rule needs at least one action")</script></if>
             <iterate list="actions" entry="action">
-                <entity-find-one entity-name="moqui.rules.RuleActionType" value-field="actionType">
+                <entity-find-one entity-name="rules.RuleActionType" value-field="actionType">
                     <field-map field-name="actionTypeId" from="action.actionTypeId"/></entity-find-one>
                 <if condition="actionType == null">
                     <script>problems.add("Action ${action_index + 1}: action type ${action.actionTypeId} is not known".toString())</script>
@@ -44,12 +44,12 @@
             </iterate>
             <iterate list="problems" entry="problem"><message error="true">${problem}</message></iterate>
 
-            <entity-find-one entity-name="moqui.rules.RuleSetRule" value-field="priorityRule">
+            <entity-find-one entity-name="rules.RuleSetRule" value-field="priorityRule">
                 <field-map field-name="ruleSetId"/><field-map field-name="priority"/></entity-find-one>
             <if condition="priorityRule != null &amp;&amp; priorityRule.ruleName != ruleName">
                 <message error="true">Priority ${priority} is already used by rule ${priorityRule.ruleName}</message></if>
 
-            <entity-find-one entity-name="moqui.rules.RuleSetRule" value-field="existingRule" for-update="true">
+            <entity-find-one entity-name="rules.RuleSetRule" value-field="existingRule" for-update="true">
                 <field-map field-name="ruleSetId"/><field-map field-name="ruleName"/></entity-find-one>
             <check-errors/>
 
@@ -57,23 +57,23 @@
                     outcomeId: it.outcomeId, factTypeId: it.factTypeId, fields: (it.fields ?: []).collect { actionField ->
                     [fieldName: actionField.fieldName, fixedValue: actionField.fixedValue as String] }] }"/>
             <if condition="existingRule == null">
-                <service-call name="create#moqui.rules.RuleSetRule" out-map="context" in-map="[ruleSetId: ruleSetId,
+                <service-call name="create#rules.RuleSetRule" out-map="context" in-map="[ruleSetId: ruleSetId,
                         ruleName: ruleName, priority: priority, description: description, changedDate: ec.user.nowTimestamp,
                         conditions: preparedLines.savedRows, actions: actionRows]"/>
                 <return/>
             </if>
 
             <set field="ruleId" from="existingRule.ruleId"/>
-            <entity-find entity-name="moqui.rules.RuleSetCondition" list="existingLines">
+            <entity-find entity-name="rules.RuleSetCondition" list="existingLines">
                 <econdition field-name="ruleId"/></entity-find>
-            <entity-find entity-name="moqui.rules.RuleSetAction" list="existingActions">
+            <entity-find entity-name="rules.RuleSetAction" list="existingActions">
                 <econdition field-name="ruleId"/><order-by field-name="actionSeqId"/></entity-find>
-            <entity-find entity-name="moqui.rules.RuleSetActionField" list="existingActionFields">
+            <entity-find entity-name="rules.RuleSetActionField" list="existingActionFields">
                 <econdition field-name="ruleId"/></entity-find>
             <set field="lineRows" from="preparedLines.savedRows"/>
             <set field="actionRows" from="actionRows.withIndex().collect { row, index ->
                     index &lt; existingActions.size() ? row + [actionSeqId: existingActions[index].actionSeqId] : row }"/>
-            <service-call name="store#moqui.rules.RuleSetRule" in-map="[ruleId: ruleId, ruleSetId: ruleSetId, ruleName: ruleName,
+            <service-call name="store#rules.RuleSetRule" in-map="[ruleId: ruleId, ruleSetId: ruleSetId, ruleName: ruleName,
                     priority: priority, description: description, changedDate: ec.user.nowTimestamp,
                     conditions: lineRows, actions: actionRows]"/>
 
@@ -132,7 +132,7 @@
             <parameter name="factTypeIds" type="List"><description>The direct fact types, then the item types reached through list fields.</description></parameter>
         </out-parameters>
         <actions>
-            <entity-find entity-name="moqui.rules.RuleSetFactType" list="readFactTypes" disable-authz="true">
+            <entity-find entity-name="rules.RuleSetFactType" list="readFactTypes" disable-authz="true">
                 <econdition field-name="ruleSetId"/></entity-find>
             <set field="directFactTypeIds" from="readFactTypes*.factTypeId"/>
             <set field="factTypeIds" from="[]"/>
@@ -141,7 +141,7 @@
                 <set field="visitedFactTypeId" from="waiting.remove(0)"/>
                 <if condition="visitedFactTypeId in factTypeIds"><continue/></if>
                 <script>factTypeIds.add(visitedFactTypeId)</script>
-                <entity-find entity-name="moqui.rules.FactField" list="listFields" disable-authz="true">
+                <entity-find entity-name="rules.FactField" list="listFields" disable-authz="true">
                     <econdition field-name="factTypeId" from="visitedFactTypeId"/>
                     <econdition field-name="itemFactTypeId" operator="is-not-null"/></entity-find>
                 <script>waiting.addAll(listFields*.itemFactTypeId)</script>
@@ -165,7 +165,7 @@
             <set field="problems" from="[]"/>
             <set field="fact" from="[:]"/>
             <set field="values" from="values ?: [:]"/>
-            <entity-find entity-name="moqui.rules.FactField" list="factFields"><econdition field-name="factTypeId"/></entity-find>
+            <entity-find entity-name="rules.FactField" list="factFields"><econdition field-name="factTypeId"/></entity-find>
             <set field="unknownFieldNames" from="values.keySet() - factFields*.fieldName"/>
             <iterate list="unknownFieldNames" entry="unknownFieldName">
                 <script>problems.add("Fact type ${factTypeId} has no field ${unknownFieldName}".toString())</script></iterate>
@@ -215,9 +215,9 @@
             <parameter name="matchedRules" type="List"><description>Maps of ruleId, ruleName, priority and outcomeId for every rule that matched.</description></parameter>
         </out-parameters>
         <actions>
-            <entity-find-one entity-name="moqui.rules.RuleSet" value-field="ruleSet"/>
+            <entity-find-one entity-name="rules.RuleSet" value-field="ruleSet"/>
             <if condition="ruleSet == null"><return error="true" message="Decision ${ruleSetId} does not exist"/></if>
-            <entity-find entity-name="moqui.rules.RuleSetFactType" list="readFactTypeList">
+            <entity-find entity-name="rules.RuleSetFactType" list="readFactTypeList">
                 <econdition field-name="ruleSetId"/></entity-find>
             <set field="readFactTypeIds" from="readFactTypeList*.factTypeId"/>
 
@@ -268,7 +268,7 @@
             <if condition="!ec.entity.isEntityDefined(entityName)"><return error="true" message="Entity ${entityName} does not exist"/></if>
             <set field="groupByFieldNames" from="groupByFieldNames ?: []"/>
             <iterate list="groupByFieldNames" entry="groupByFieldName">
-                <entity-find-one entity-name="moqui.rules.FactField" value-field="groupByField">
+                <entity-find-one entity-name="rules.FactField" value-field="groupByField">
                     <field-map field-name="factTypeId"/><field-map field-name="fieldName" from="groupByFieldName"/></entity-find-one>
                 <if condition="groupByField == null"><message error="true">Fact type ${factTypeId} has no field ${groupByFieldName}</message></if>
             </iterate>
@@ -390,22 +390,22 @@
             <check-errors/>
             <set field="fileRecords" from="read.records"/>
 
-            <entity-find-one entity-name="moqui.rules.FactType" value-field="factType"/>
+            <entity-find-one entity-name="rules.FactType" value-field="factType"/>
             <if condition="factType == null">
-                <service-call name="create#moqui.rules.FactType" in-map="[factTypeId: factTypeId]"/></if>
+                <service-call name="create#rules.FactType" in-map="[factTypeId: factTypeId]"/></if>
 
-            <entity-find entity-name="moqui.rules.FactField" list="knownFieldList">
+            <entity-find entity-name="rules.FactField" list="knownFieldList">
                 <econdition field-name="factTypeId"/></entity-find>
             <set field="records" from="fileRecords*.values"/>
             <set field="newFieldNames" from="records.collectMany { it.keySet() as List }.unique() - knownFieldList*.fieldName"/>
             <iterate list="newFieldNames" entry="fieldName">
                 <service-call name="moqui.rules.FactValueServices.guess#FactValueType" out-map="guessed" out-map-add-to-existing="false"
                         in-map="[values: records*.get(fieldName)]"/>
-                <service-call name="create#moqui.rules.FactField" in-map="[factTypeId: factTypeId, fieldName: fieldName,
+                <service-call name="create#rules.FactField" in-map="[factTypeId: factTypeId, fieldName: fieldName,
                         valueTypeEnumId: guessed.valueTypeEnumId]"/>
             </iterate>
 
-            <entity-find entity-name="moqui.rules.FactField" list="fieldList">
+            <entity-find entity-name="rules.FactField" list="fieldList">
                 <econdition field-name="factTypeId"/><order-by field-name="fieldName"/></entity-find>
             <set field="fields" from="fieldList.collect { [fieldName: it.fieldName, valueTypeEnumId: it.valueTypeEnumId] }"/>
         </actions>
@@ -422,7 +422,7 @@
             <parameter name="valueTypeEnumId" required="true"/>
         </in-parameters>
         <actions>
-            <entity-find-one entity-name="moqui.rules.FactField" value-field="factField"/>
+            <entity-find-one entity-name="rules.FactField" value-field="factField"/>
             <if condition="factField == null">
                 <return error="true" message="Fact type ${factTypeId} has no field ${fieldName}"/></if>
             <service-call name="moqui.rules.FactValueServices.convert#FactValue" out-map="oldKind" out-map-add-to-existing="false"
@@ -432,11 +432,11 @@
             <if condition="oldKind.problem || newKind.problem">
                 <return error="true" message="Field ${fieldName} of ${factTypeId} can only change between kinds that hold one value"/></if>
 
-            <entity-find entity-name="moqui.rules.RuleSetConditionAndRule" list="lineList">
+            <entity-find entity-name="rules.RuleSetConditionAndRule" list="lineList">
                 <econdition field-name="factTypeId"/><econdition field-name="fieldName"/></entity-find>
             <set field="problems" from="[]"/>
             <iterate list="lineList" entry="line">
-                <entity-find-one entity-name="moqui.rules.RuleConditionType" value-field="conditionType">
+                <entity-find-one entity-name="rules.RuleConditionType" value-field="conditionType">
                     <field-map field-name="conditionTypeId" from="line.conditionTypeId"/></entity-find-one>
                 <service-call name="${conditionType.prepareServiceName}" out-map="prepared" out-map-add-to-existing="false"
                         in-map="[line: line, childLines: [], readFactTypeIds: [factTypeId], valueTypeEnumId: valueTypeEnumId]"/>
@@ -445,7 +445,7 @@
             <iterate list="problems" entry="problem"><message error="true">${problem}</message></iterate>
             <check-errors/>
 
-            <service-call name="update#moqui.rules.FactField"
+            <service-call name="update#rules.FactField"
                     in-map="[factTypeId: factTypeId, fieldName: fieldName, valueTypeEnumId: valueTypeEnumId]"/>
         </actions>
     </service>
@@ -467,9 +467,9 @@
                 outcomes and matchedRules as evaluate#RuleSet gives them, or refusedReasons.</description></parameter>
         </out-parameters>
         <actions>
-            <entity-find-one entity-name="moqui.rules.RuleSet" value-field="ruleSet"/>
+            <entity-find-one entity-name="rules.RuleSet" value-field="ruleSet"/>
             <if condition="ruleSet == null"><return error="true" message="Decision ${ruleSetId} does not exist"/></if>
-            <entity-find-one entity-name="moqui.rules.RuleSetFactType" value-field="ruleSetFactType"/>
+            <entity-find-one entity-name="rules.RuleSetFactType" value-field="ruleSetFactType"/>
             <if condition="ruleSetFactType == null">
                 <return error="true" message="Decision ${ruleSetId} does not read fact type ${factTypeId}"/></if>
             <service-call name="moqui.rules.RuleServices.read#FileRecords" in-map="[fileName: fileName, fileText: fileText]"
@@ -500,7 +500,7 @@
                         refusedReasons: refusedReasons ? groovy.json.JsonOutput.toJson(refusedReasons) : null])</script>
             </iterate>
 
-            <service-call name="create#moqui.rules.FileCheck" out-map="context"
+            <service-call name="create#rules.FileCheck" out-map="context"
                     in-map="[ruleSetId: ruleSetId, factTypeId: factTypeId, fileName: fileName, checkedDate: ec.user.nowTimestamp,
                         checkedByUserId: ec.user.userId, recordCount: checkedRecords.size(),
                         refusedCount: checkedRecords.count { it.refusedReasons }, records: keptRows]"/>
@@ -518,10 +518,10 @@
                 recordNumber, recordValues, outcomes and refusedReasons.</description></parameter>
         </out-parameters>
         <actions>
-            <entity-find-one entity-name="moqui.rules.FileCheck" value-field="fileCheckValue"/>
+            <entity-find-one entity-name="rules.FileCheck" value-field="fileCheckValue"/>
             <if condition="fileCheckValue == null">
                 <return error="true" message="File check ${fileCheckId} does not exist"/></if>
-            <entity-find entity-name="moqui.rules.FileCheckRecord" list="recordList">
+            <entity-find entity-name="rules.FileCheckRecord" list="recordList">
                 <econdition field-name="fileCheckId"/><order-by field-name="recordNumber"/></entity-find>
             <set field="jsonSlurper" from="new groovy.json.JsonSlurper()"/>
             <set field="fileCheck" from="fileCheckValue.getMap() + [records: recordList.collect { [recordNumber: it.recordNumber,

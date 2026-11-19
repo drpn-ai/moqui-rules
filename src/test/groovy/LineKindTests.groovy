@@ -8,15 +8,15 @@ class LineKindTests extends Specification {
     @Shared String ruleSetId = "RULES_TEST_LINE_KINDS"
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeDecision()
-        ec.entity.makeValue("moqui.rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "N"]).create()
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "N"]).create()
         for (String factTypeId in ["checkResult", "salesOrder"])
-            ec.entity.makeValue("moqui.rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
+            ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
         for (String outcomeId in ["NEITHER", "NO_DIGITAL"])
-            ec.entity.makeValue("moqui.rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: outcomeId]).create()
+            ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: outcomeId]).create()
         assert storeRule("neither", 20, "NEITHER", [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"],
                 compare("02", "checkResult", "refusedCount", "0", "01"),
                 compare("03", "checkResult", "logStatusId", "DmlsFinished", "01")]) == []
@@ -33,19 +33,19 @@ class LineKindTests extends Specification {
     }
 
     void removeDecision() {
-        List<String> ruleIds = ec.entity.find("moqui.rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
+        List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
         if (ruleIds) {
             for (int depth = 0; depth < 3; depth++)
-                ec.entity.find("moqui.rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
+                ec.entity.find("rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
                         .condition("parentConditionSeqId", EntityCondition.ComparisonOperator.IS_NOT_NULL, null).list()
-                        .findAll { line -> !ec.entity.find("moqui.rules.RuleSetCondition").condition([ruleId: line.ruleId,
+                        .findAll { line -> !ec.entity.find("rules.RuleSetCondition").condition([ruleId: line.ruleId,
                                 parentConditionSeqId: line.conditionSeqId]).count() }
                         .each { it.delete() }
             for (String entityName in ["RuleSetActionField", "RuleSetAction", "RuleSetCondition", "RuleSetRule"])
-                ec.entity.find("moqui.rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
+                ec.entity.find("rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
         }
         for (String entityName in ["RuleSetOutcome", "RuleSetFactType", "RuleSet"])
-            ec.entity.find("moqui.rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
+            ec.entity.find("rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
     }
 
     static Map compare(String seqId, String factTypeId, String fieldName, String compareValue, String parentSeqId) {

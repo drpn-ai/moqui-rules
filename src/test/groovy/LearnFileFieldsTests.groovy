@@ -9,7 +9,7 @@ class LearnFileFieldsTests extends Specification {
     @Shared String refusedFactTypeId = "RULES_TEST_REFUSED_FILE"
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeTestKinds()
@@ -24,8 +24,8 @@ class LearnFileFieldsTests extends Specification {
 
     void removeTestKinds() {
         for (String factTypeId in [refundsFactTypeId, shipmentsFactTypeId, refusedFactTypeId]) {
-            ec.entity.find("moqui.rules.FactField").condition("factTypeId", factTypeId).deleteAll()
-            ec.entity.find("moqui.rules.FactType").condition("factTypeId", factTypeId).deleteAll()
+            ec.entity.find("rules.FactField").condition("factTypeId", factTypeId).deleteAll()
+            ec.entity.find("rules.FactType").condition("factTypeId", factTypeId).deleteAll()
         }
     }
 
@@ -47,7 +47,7 @@ class LearnFileFieldsTests extends Specification {
         learned.errors == []
         learned.newFieldNames == ["orderId", "amount", "reason"]
         learned.fields == [amount: "FVT_DECIMAL", orderId: "FVT_INTEGER", reason: "FVT_TEXT"]
-        ec.entity.find("moqui.rules.FactType").condition("factTypeId", refundsFactTypeId).count() == 1
+        ec.entity.find("rules.FactType").condition("factTypeId", refundsFactTypeId).count() == 1
     }
 
     def "the same kind with a new column adds only that column and keeps the fields it has"() {
@@ -90,7 +90,7 @@ class LearnFileFieldsTests extends Specification {
         then:
         learned.errors.any { it.contains(problem) }
         learned.fields == null
-        ec.entity.find("moqui.rules.FactType").condition("factTypeId", refusedFactTypeId).count() == 0
+        ec.entity.find("rules.FactType").condition("factTypeId", refusedFactTypeId).count() == 0
 
         where:
         fileName        | fileText                                         | problem

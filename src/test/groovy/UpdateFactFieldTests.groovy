@@ -9,18 +9,18 @@ class UpdateFactFieldTests extends Specification {
     @Shared String ruleSetId = "RULES_TEST_KIND_FIX_SET"
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeTestData()
-        ec.entity.makeValue("moqui.rules.FactType").setAll([factTypeId: factTypeId]).create()
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: factTypeId]).create()
         [code: "FVT_INTEGER", amount: "FVT_DECIMAL", reason: "FVT_TEXT"].each { String fieldName, String valueTypeEnumId ->
-            ec.entity.makeValue("moqui.rules.FactField").setAll([factTypeId: factTypeId, fieldName: fieldName,
+            ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: fieldName,
                     valueTypeEnumId: valueTypeEnumId]).create()
         }
-        ec.entity.makeValue("moqui.rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "N"]).create()
-        ec.entity.makeValue("moqui.rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
-        ec.entity.makeValue("moqui.rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: "REVIEW"]).create()
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "N"]).create()
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
+        ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: "REVIEW"]).create()
         storeRule("code seven", 30, "code", "ENTCO_EQUALS", "7")
         storeRule("big refund", 20, "amount", "ENTCO_GREATER", "30")
         storeRule("damaged", 10, "reason", "ENTCO_LIKE", "%damage%")
@@ -34,15 +34,15 @@ class UpdateFactFieldTests extends Specification {
     }
 
     void removeTestData() {
-        List<String> ruleIds = ec.entity.find("moqui.rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
+        List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
         if (ruleIds) {
             for (String entityName in ["RuleSetAction", "RuleSetCondition", "RuleSetRule"])
-                ec.entity.find("moqui.rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
+                ec.entity.find("rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
         }
         for (String entityName in ["RuleSetOutcome", "RuleSetFactType", "RuleSet"])
-            ec.entity.find("moqui.rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
-        ec.entity.find("moqui.rules.FactField").condition("factTypeId", factTypeId).deleteAll()
-        ec.entity.find("moqui.rules.FactType").condition("factTypeId", factTypeId).deleteAll()
+            ec.entity.find("rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
+        ec.entity.find("rules.FactField").condition("factTypeId", factTypeId).deleteAll()
+        ec.entity.find("rules.FactType").condition("factTypeId", factTypeId).deleteAll()
     }
 
     void storeRule(String ruleName, int priority, String fieldName, String operatorEnumId, String compareValue) {
@@ -69,7 +69,7 @@ class UpdateFactFieldTests extends Specification {
     }
 
     String kindOf(String fieldName) {
-        return ec.entity.find("moqui.rules.FactField").condition([factTypeId: factTypeId, fieldName: fieldName])
+        return ec.entity.find("rules.FactField").condition([factTypeId: factTypeId, fieldName: fieldName])
                 .useCache(false).one()?.valueTypeEnumId
     }
 

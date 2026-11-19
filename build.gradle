@@ -29,7 +29,7 @@ test {
     testLogging { events "passed", "skipped", "failed" }
     testLogging.showStandardStreams = true; testLogging.showExceptions = true
     maxParallelForks 1
-    include '**/*MoquiSuite.class'
+    include project.hasProperty('spec') ? "**/${project.property('spec')}.class" : '**/*MoquiSuite.class'
     systemProperty 'moqui.runtime', runtimeDir.absolutePath
     systemProperty 'moqui.conf', 'conf/MoquiDevConf.xml'
     systemProperty 'moqui.init.static', 'true'
