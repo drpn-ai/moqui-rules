@@ -218,10 +218,12 @@
         <out-parameters>
             <parameter name="outcomes" type="List"><description>Outcome ids over all facts, highest priority first. Only the first when the decision has firstMatchOnly Y.</description></parameter>
             <parameter name="matchedRules" type="List"><description>Maps of ruleId, ruleName, priority, outcomeId and recordIds,
-                a Map of factTypeId to the record id of each fact the rule matched, for every rule that matched.</description></parameter>
+                a Map of factTypeId to the record id of each fact the rule matched, for every rule that matched. A match on
+                a fact a rule added names the records of the facts that made that rule fire.</description></parameter>
             <parameter name="decisions" type="List"><description>One map of recordId, outcomes and matchedRules per fact of
-                the decision's fact type, in input order, each judged alone. Empty when the decision reads more than one
-                fact type directly.</description></parameter>
+                the decision's fact type, in input order, each judged alone. A fact a rule added counts for the record of
+                the one fact that rule matched; a fact added by a rule that matched two or more facts counts for no record,
+                so matches on it are only in matchedRules. Empty when the decision reads more than one fact type directly.</description></parameter>
         </out-parameters>
         <actions>
             <entity-find-one entity-name="rules.RuleSet" value-field="ruleSet"/>

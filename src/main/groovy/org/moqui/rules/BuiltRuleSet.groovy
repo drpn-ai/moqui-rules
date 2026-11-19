@@ -75,18 +75,28 @@ class BuiltRuleSet {
             session.dispose()
         }
 
+        // entries come in firing order, so a fact a rule added is credited before any rule matches it
+        Map<PrototypeFactInstance, Map> addedFactRecordIds = new IdentityHashMap<>()
         List<Map> ruleMatches = []
         for (Map entry in matchList) {
+            Map<String, PrototypeFactInstance> matchedFacts = (Map<String, PrototypeFactInstance>) entry.remove("matchedFacts")
+            Map recordIds = [:]
+            matchedFacts.each { String factTypeId, PrototypeFactInstance fact ->
+                Map carriedRecordIds = addedFactRecordIds.get(fact)
+                if (carriedRecordIds != null) recordIds.putAll(carriedRecordIds)
+                else if (fact.has(RECORD_ID_FIELD)) recordIds.put(factTypeId, fact.get(RECORD_ID_FIELD))
+            }
+            // only a rule that matched one fact answers for one record; an addition from several facts answers for none
+            Integer groupIndex = matchedFacts.size() == 1 ? groupIndexes.get(matchedFacts.values().first()) : null
             if (entry.addedFact != null) {
-                // a fact a rule added answers for the record whose fact made the rule fire
-                Integer fromIndex = groupIndexes.get((PrototypeFactInstance) entry.fromFact)
-                if (fromIndex != null) groupIndexes.put((PrototypeFactInstance) entry.addedFact, fromIndex)
+                PrototypeFactInstance addedFact = (PrototypeFactInstance) entry.addedFact
+                addedFactRecordIds.put(addedFact, recordIds)
+                if (groupIndex != null) groupIndexes.put(addedFact, groupIndex)
                 continue
             }
-            Map<String, PrototypeFactInstance> matchedFacts = (Map<String, PrototypeFactInstance>) entry.remove("matchedFacts")
+            entry.recordIds = recordIds
             ruleMatches.add(entry)
-            Integer groupIndex = groupFactTypeId ? groupIndexes.get(matchedFacts.get(groupFactTypeId)) : null
-            if (groupIndex != null) ((List) decisions[groupIndex].matchedRules).add(entry)
+            if (groupFactTypeId != null && groupIndex != null) ((List) decisions[groupIndex].matchedRules).add(entry)
         }
 
         Map decided = answerFor(ruleMatches, firstMatchOnly)

@@ -91,21 +91,15 @@ class RuleSetBuilder {
         Map<String, PrototypeFact> factPrototypes = prototypes
         List<String> boundFactTypeIds = factVariables.keySet().collect()
 
+        // decide reads the record ids from the matched facts; it credits an added fact to the facts that made the rule fire
         Closure fire = { Drools drools, List matchList, List<PrototypeFactInstance> boundFacts ->
             Map<String, PrototypeFactInstance> matchedFacts = [:]
-            Map<String, Object> recordIds = [:]
-            boundFacts.eachWithIndex { PrototypeFactInstance fact, int index ->
-                matchedFacts.put(boundFactTypeIds[index], fact)
-                if (fact.has(BuiltRuleSet.RECORD_ID_FIELD)) recordIds.put(boundFactTypeIds[index], fact.get(BuiltRuleSet.RECORD_ID_FIELD))
-            }
-            for (Map ruleMatch in ruleMatches) matchList.add(ruleMatch + [recordIds: recordIds, matchedFacts: matchedFacts])
-            PrototypeFactInstance fromFact = boundFacts.size() == 1 ? boundFacts[0] : null
+            boundFacts.eachWithIndex { PrototypeFactInstance fact, int index -> matchedFacts.put(boundFactTypeIds[index], fact) }
+            for (Map ruleMatch in ruleMatches) matchList.add(ruleMatch + [matchedFacts: matchedFacts])
             for (Map factToAdd in factsToAdd) {
                 PrototypeFactInstance newFact = factPrototypes.get((String) factToAdd.factTypeId).newInstance()
                 ((Map) factToAdd.values).each { String fieldName, Object value -> newFact.put(fieldName, value) }
-                if (fromFact != null && fromFact.has(BuiltRuleSet.RECORD_ID_FIELD))
-                    newFact.put(BuiltRuleSet.RECORD_ID_FIELD, fromFact.get(BuiltRuleSet.RECORD_ID_FIELD))
-                if (fromFact != null) matchList.add([addedFact: newFact, fromFact: fromFact])
+                matchList.add([addedFact: newFact, matchedFacts: matchedFacts])
                 drools.insert(newFact)
             }
         }.dehydrate()

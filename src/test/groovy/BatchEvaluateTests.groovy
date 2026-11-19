@@ -7,7 +7,9 @@ class BatchEvaluateTests extends Specification {
     @Shared ExecutionContext ec
     @Shared String ruleSetId = "RULES_TEST_BATCH"
     @Shared String typesRuleSetId = "RULES_TEST_BATCH_TYPES"
-    @Shared List<String> extraFactTypeIds = ["batchTestA", "batchTestB", "batchTestC"]
+    @Shared String chainRuleSetId = "RULES_TEST_BATCH_CHAIN"
+    @Shared String pairRuleSetId = "RULES_TEST_BATCH_PAIR"
+    @Shared List<String> extraFactTypeIds = ["batchTestA", "batchTestB", "batchTestC", "batchStep"]
 
     def setupSpec() {
         ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
@@ -15,6 +17,8 @@ class BatchEvaluateTests extends Specification {
         ec.artifactExecution.disableAuthz()
         removeDecision(ruleSetId)
         removeDecision(typesRuleSetId)
+        removeDecision(chainRuleSetId)
+        removeDecision(pairRuleSetId)
         removeExtraFactTypes()
 
         createDecision(ruleSetId, ["checkResult"])
@@ -33,11 +37,26 @@ class BatchEvaluateTests extends Specification {
                 compare("01", "checkResult", "refusedCount", "ENTCO_EQUALS", "0"),
                 compare("02", "batchTestA", "code", "ENTCO_EQUALS", "a"),
                 compare("03", "batchTestB", "code", "ENTCO_EQUALS", "b")])
+
+        // one record fact type: a rule adds a step of the same type, and a second rule matches that step
+        createDecision(chainRuleSetId, ["batchStep"])
+        storeRule(chainRuleSetId, "start", 20, [compare("01", "batchStep", "code", "ENTCO_EQUALS", "go")],
+                [[actionTypeId: "RAT_ADD_FACT", factTypeId: "batchStep", fields: [[fieldName: "code", fixedValue: "next"]]]])
+        storeRule(chainRuleSetId, "next step", 10, "CHECK_AGAIN", [compare("01", "batchStep", "code", "ENTCO_EQUALS", "next")])
+
+        // two record fact types: a rule over both adds a third kind of fact, and a second rule matches it
+        createDecision(pairRuleSetId, ["batchTestA", "batchTestB", "batchTestC"])
+        storeRule(pairRuleSetId, "pair", 20, [compare("01", "batchTestA", "code", "ENTCO_EQUALS", "a"),
+                compare("02", "batchTestB", "code", "ENTCO_EQUALS", "b")],
+                [[actionTypeId: "RAT_ADD_FACT", factTypeId: "batchTestC", fields: [[fieldName: "code", fixedValue: "c"]]]])
+        storeRule(pairRuleSetId, "after pair", 10, "SWITCH_ON", [compare("01", "batchTestC", "code", "ENTCO_EQUALS", "c")])
     }
 
     def cleanupSpec() {
         removeDecision(ruleSetId)
         removeDecision(typesRuleSetId)
+        removeDecision(chainRuleSetId)
+        removeDecision(pairRuleSetId)
         removeExtraFactTypes()
         ec.artifactExecution.enableAuthz()
         ec.user.logoutUser()
@@ -75,9 +94,13 @@ class BatchEvaluateTests extends Specification {
     }
 
     List<String> storeRule(String id, String ruleName, int priority, String outcomeId, List<Map> conditions, boolean mustStore = true) {
+        return storeRule(id, ruleName, priority, conditions, [[actionTypeId: "RAT_OUTCOME", outcomeId: outcomeId]], mustStore)
+    }
+
+    List<String> storeRule(String id, String ruleName, int priority, List<Map> conditions, List<Map> actions, boolean mustStore = true) {
         ec.message.clearAll()
         ec.service.sync().name("moqui.rules.RuleServices.store#Rule").parameters([ruleSetId: id, ruleName: ruleName,
-                priority: priority, conditions: conditions, actions: [[actionTypeId: "RAT_OUTCOME", outcomeId: outcomeId]]]).call()
+                priority: priority, conditions: conditions, actions: actions]).call()
         List<String> errors = ec.message.errors.collect()
         ec.message.clearAll()
         if (mustStore) assert errors == []
@@ -163,5 +186,31 @@ class BatchEvaluateTests extends Specification {
         then:
         errors.any { it.contains("_recordId") }
         ec.entity.find("rules.FactType").condition("factTypeId", "batchTestFile").count() == 0
+    }
+
+    def "a fact a rule added answers for the record whose fact made the rule fire"() {
+        when:
+        Map out = evaluate([[factTypeId: "batchStep", recordId: "A", fact: [code: "go"]],
+                            [factTypeId: "batchStep", recordId: "B", fact: [code: "stop"]]], chainRuleSetId)
+        then:
+        !ec.message.hasError()
+        out.decisions*.recordId == ["A", "B"]
+        out.decisions[0].outcomes == ["CHECK_AGAIN"]
+        out.decisions[0].matchedRules*.ruleName == ["start", "next step"]
+        out.decisions[1].outcomes == []
+        out.decisions[1].matchedRules == []
+        out.matchedRules.find { it.ruleName == "next step" }.recordIds == [batchStep: "A"]
+    }
+
+    def "a fact added by a rule over two facts names both records but answers for no record"() {
+        when:
+        Map out = evaluate([[factTypeId: "batchTestA", recordId: "A1", fact: [code: "a"]],
+                            [factTypeId: "batchTestB", recordId: "B1", fact: [code: "b"]]], pairRuleSetId)
+        Map followOn = out.matchedRules.find { it.ruleName == "after pair" }
+        then:
+        !ec.message.hasError()
+        out.outcomes == ["SWITCH_ON"]
+        followOn.recordIds == [batchTestA: "A1", batchTestB: "B1"]
+        !out.decisions.any { decision -> decision.matchedRules.any { it.ruleName == "after pair" } }
     }
 }
