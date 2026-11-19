@@ -1,7 +1,6 @@
 import spock.lang.*
 import org.moqui.context.ExecutionContext
 import org.moqui.Moqui
-import org.moqui.entity.EntityCondition
 
 class CompareFieldLineTests extends Specification {
     @Shared ExecutionContext ec
@@ -32,8 +31,13 @@ class CompareFieldLineTests extends Specification {
     void removeAll() {
         List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
         if (ruleIds) {
-            ec.entity.find("rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
-                    .condition("parentConditionSeqId", EntityCondition.ComparisonOperator.IS_NOT_NULL, null).deleteAll()
+            // lines nest more than one level deep: delete leaves first, so no line is deleted before the lines under it
+            List lines = ec.entity.find("rules.RuleSetCondition").condition("ruleId", "in", ruleIds).useCache(false).list().collect()
+            while (lines) {
+                List leaves = lines.findAll { line -> !lines.any { it.ruleId == line.ruleId && it.parentConditionSeqId == line.conditionSeqId } }
+                leaves*.delete()
+                lines.removeAll(leaves)
+            }
             for (String entityName in ["RuleSetActionField", "RuleSetAction", "RuleSetCondition", "RuleSetRule"])
                 ec.entity.find("rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
         }
