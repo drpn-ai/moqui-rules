@@ -27,6 +27,15 @@
     <rules.RuleConditionType conditionTypeId="RCT_EXISTS" description="One List Item Matches"
             prepareServiceName="moqui.rules.RuleLineServices.prepare#ExistsLine"/>
 
+    <rules.RuleConditionType conditionTypeId="RCT_COMPARE_FIELD" description="Compare Two Fields"
+            prepareServiceName="moqui.rules.RuleLineServices.prepare#CompareFieldLine"/>
+
+    <moqui.basic.EnumerationType enumTypeId="FieldPairOperator" description="Operator Between Two Fields"/>
+    <moqui.basic.Enumeration enumTypeId="FieldPairOperator" enumId="FPO_REQUIRES" description="requires" sequenceNum="1"/>
+    <moqui.basic.Enumeration enumTypeId="FieldPairOperator" enumId="FPO_REQUIRED_BY" description="required by" sequenceNum="2"/>
+    <moqui.basic.Enumeration enumTypeId="FieldPairOperator" enumId="FPO_ALL_IN" description="all in" sequenceNum="3"/>
+    <moqui.basic.Enumeration enumTypeId="FieldPairOperator" enumId="FPO_CONTAINS_ALL" description="contains all" sequenceNum="4"/>
+
     <rules.RuleActionType actionTypeId="RAT_OUTCOME" description="Return an Outcome"
             prepareServiceName="moqui.rules.RuleActionServices.prepare#OutcomeAction"/>
     <rules.RuleActionType actionTypeId="RAT_ADD_FACT" description="Add a Fact"

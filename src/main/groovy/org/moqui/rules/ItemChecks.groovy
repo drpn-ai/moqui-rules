@@ -4,7 +4,8 @@ import org.moqui.entity.EntityCondition
 
 class ItemChecks {
     static boolean matches(Map match, Map values) {
-        return ((EntityCondition) match.condition).mapMatches(values) && ((List<Map>) match.itemChecks).every { holds(it, values) }
+        return ((EntityCondition) match.condition).mapMatches(values) && ((List<Map>) match.itemChecks).every { holds(it, values) } &&
+                ((List<Map>) (match.valueChecks ?: [])).every { ValueChecks.holds(it, values) }
     }
 
     static boolean holds(Map itemCheck, Map values) {

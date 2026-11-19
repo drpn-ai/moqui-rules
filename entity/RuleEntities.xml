@@ -133,6 +133,8 @@
         <field name="fieldName" type="id" enable-audit-log="true"/>
         <field name="operatorEnumId" type="id" enable-audit-log="true"/>
         <field name="compareValue" type="text-medium" enable-audit-log="true"/>
+        <field name="compareFieldName" type="id" enable-audit-log="true"><description>The other field of the same fact a compare-two-fields line reads.</description></field>
+        <field name="tolerance" type="number-decimal" enable-audit-log="true"><description>How far apart two numbers may be and still count as equal.</description></field>
         <relationship type="one" related="rules.RuleSetRule"/>
         <relationship type="one" title="Parent" related="rules.RuleSetCondition" short-alias="parent">
             <key-map field-name="ruleId"/><key-map field-name="parentConditionSeqId" related="conditionSeqId"/></relationship>

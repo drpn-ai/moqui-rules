@@ -14,7 +14,7 @@
             <parameter name="description"/>
             <parameter name="conditions" type="List">
                 <description>Maps of conditionSeqId, parentConditionSeqId, conditionTypeId, factTypeId, fieldName,
-                    operatorEnumId and compareValue. Lines with no parent must all match.</description>
+                    operatorEnumId, compareValue, compareFieldName and tolerance. Lines with no parent must all match.</description>
             </parameter>
             <parameter name="actions" type="List" required="true">
                 <description>Maps of actionTypeId, outcomeId, factTypeId and fields, a list of maps of fieldName and fixedValue.</description>
