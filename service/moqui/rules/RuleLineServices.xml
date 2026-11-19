@@ -64,7 +64,7 @@
                                 in-map="[line: row, childLines: childLines, readFactTypeIds: readFactTypeIds, pieceChain: pieceChain ?: []]"/>
                     </else>
                 </if>
-                <script>preparedBySeqId.put(row.conditionSeqId, prepared + [conditionSeqId: row.conditionSeqId])
+                <script>preparedBySeqId.put(row.conditionSeqId, prepared + [conditionSeqId: row.conditionSeqId, row: row, children: childLines])
                     problems.addAll(prepared.problems.collect { "Condition ${row.conditionSeqId} of rule ${ruleName}: ${it}".toString() })</script>
             </iterate>
 
@@ -102,6 +102,9 @@
         <description>Use a named piece: compareValue holds the pieceId. The piece's own lines are prepared the way a rule's
             are, against the fact types the decision reads, and give their AND as this one line. A piece that uses itself,
             or nests past 3 levels, is refused.</description>
+        <out-parameters>
+            <parameter name="innerLines" type="List"><description>What each top line of the piece gave, for explain#RuleSet.</description></parameter>
+        </out-parameters>
         <actions>
             <set field="problems" from="[]"/>
             <set field="factTypeIds" from="[]"/>
@@ -146,6 +149,7 @@
             </if>
 
             <set field="inner" from="preparedPiece.topLines"/>
+            <set field="innerLines" from="inner"/>
             <set field="conditionFactory" from="ec.entity.conditionFactory"/>
             <set field="matches" from="[condition: conditionFactory.makeCondition(inner*.matches*.condition, org.moqui.entity.EntityCondition.AND),
                     itemChecks: inner.collectMany { it.matches.itemChecks },

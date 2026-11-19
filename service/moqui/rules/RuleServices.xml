@@ -315,6 +315,68 @@
         </actions>
     </service>
 
+    <service verb="explain" noun="RuleSet" authenticate="true">
+        <description>Say, for one fact, whether each rule of a decision holds and whether each line of each rule does. The
+            lines are prepared by the same service the decision builder uses and judged with the same checks, so a rule is
+            matched here exactly when evaluate#RuleSet would match it for this fact. No rules session is built. The decision
+            must read one fact type directly.</description>
+        <in-parameters>
+            <parameter name="ruleSetId" required="true"/>
+            <parameter name="factTypeId" required="true"/>
+            <parameter name="fact" type="Map"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="rules" type="List"><description>Maps of ruleId, ruleName, priority, outcomeIds, matched and lines,
+                highest priority first. A line is a map of conditionSeqId, conditionTypeId, text, holds and lines under it; a
+                piece line holds the piece's lines. Under an exists line a line holds when some list item meets it.</description></parameter>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="rules.RuleSet" value-field="ruleSet"/>
+            <if condition="ruleSet == null"><return error="true" message="Decision ${ruleSetId} does not exist"/></if>
+            <service-call name="moqui.rules.RuleServices.get#DecisionFactTypes" in-map="[ruleSetId: ruleSetId]"
+                    out-map="decisionFactTypes" out-map-add-to-existing="false"/>
+            <if condition="!(factTypeId in decisionFactTypes.directFactTypeIds)">
+                <return error="true" message="Decision ${ruleSetId} does not read fact type ${factTypeId} directly"/></if>
+            <service-call name="moqui.rules.RuleServices.convert#Fact" out-map="converted" out-map-add-to-existing="false"
+                    in-map="[factTypeId: factTypeId, values: fact]"/>
+            <iterate list="converted.problems" entry="factProblem"><message error="true">${factProblem}</message></iterate>
+            <check-errors/>
+
+            <entity-find entity-name="moqui.basic.Enumeration" list="operatorEnums">
+                <econdition field-name="enumTypeId" operator="in" from="['ComparisonOperator', 'FieldPairOperator']"/></entity-find>
+            <set field="operatorWords" from="operatorEnums.collectEntries { [(it.enumId): it.description] }"/>
+            <entity-find entity-name="rules.RuleSetRule" list="ruleList">
+                <econdition field-name="ruleSetId"/><order-by field-name="-priority"/></entity-find>
+
+            <set field="rules" from="[]"/>
+            <set field="explainProblems" from="[]"/>
+            <iterate list="ruleList" entry="rule">
+                <entity-find entity-name="rules.RuleSetCondition" list="conditionList">
+                    <econdition field-name="ruleId" from="rule.ruleId"/><order-by field-name="sequenceNum"/></entity-find>
+                <service-call name="moqui.rules.RuleLineServices.prepare#RuleLines" out-map="preparedLines" out-map-add-to-existing="false"
+                        in-map="[ruleSetId: ruleSetId, ruleName: rule.ruleName, conditions: conditionList.collect { it.getMap() }]"/>
+                <if condition="preparedLines.problems">
+                    <script>explainProblems.addAll(preparedLines.problems)</script>
+                    <continue/>
+                </if>
+                <set field="otherFactTypeIds" from="preparedLines.factMatches.keySet() - [factTypeId]"/>
+                <if condition="otherFactTypeIds">
+                    <script>explainProblems.add("explain reads one fact type; rule ${rule.ruleName} also reads ${otherFactTypeIds.join(', ')}".toString())</script>
+                    <continue/>
+                </if>
+                <entity-find entity-name="rules.RuleSetAction" list="outcomeActions">
+                    <econdition field-name="ruleId" from="rule.ruleId"/><econdition field-name="actionTypeId" value="RAT_OUTCOME"/>
+                    <order-by field-name="actionSeqId"/></entity-find>
+                <set field="factMatch" from="preparedLines.factMatches.get(factTypeId)"/>
+                <script>rules.add([ruleId: rule.ruleId, ruleName: rule.ruleName, priority: rule.priority, outcomeIds: outcomeActions*.outcomeId,
+                    matched: factMatch == null || org.moqui.rules.ItemChecks.matches(factMatch, converted.fact),
+                    lines: preparedLines.topLines.collect { org.moqui.rules.LineTrace.trace(it, converted.fact, operatorWords) }])</script>
+            </iterate>
+            <iterate list="explainProblems" entry="explainProblem"><message error="true">${explainProblem}</message></iterate>
+            <check-errors/>
+        </actions>
+    </service>
+
     <service verb="evaluate" noun="RuleSetOverSearch" authenticate="true">
         <description>Build a fact for every row a search finds, run one decision on each, and count the outcomes. The search
             reads searchParameters the way a Moqui find form reads its fields: fieldName, fieldName_op, fieldName_not.
