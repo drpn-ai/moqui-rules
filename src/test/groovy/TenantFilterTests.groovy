@@ -63,9 +63,28 @@ class TenantFilterTests extends Specification {
     def "no moqui-rules entity is in the moqui package, so entity filters can apply"() {
         expect:
         ["FactType","FactField","FactNode","FactNodeCondition","RuleSet","RuleSetFactType","RuleSetOutcome","RuleSetRule",
-         "RuleConditionType","RuleSetCondition","RuleSetConditionAndRule","RuleActionType","RuleSetAction","RuleSetActionField",
-         "FileCheck","FileCheckRecord"]
+         "RuleConditionType","RuleSetCondition","RuleSetConditionAndRule","RulePiece","RulePieceCondition",
+         "RuleSetConditionPieceUse","RuleActionType","RuleSetAction","RuleSetActionField","FileCheck","FileCheckRecord"]
                 .every { ec.entity.isEntityDefined("rules." + it) && !ec.entity.isEntityDefined("moqui.rules." + it) }
+    }
+
+    def "no moqui-rules entity shares a table with any other entity"() {
+        when: "every defined entity is read with its table name"
+        def efi = ec.entity
+        Map<String, String> tableByEntity = [:]
+        for (String entityName in efi.getAllEntityNames()) {
+            def ed
+            try { ed = efi.getEntityDefinition(entityName) } catch (Exception e) { continue }
+            if (ed != null && !ed.isViewEntity) tableByEntity.put(entityName, ed.getTableName().toUpperCase(Locale.ROOT))
+        }
+        Map<String, String> rulesTables = tableByEntity.findAll { it.key.startsWith("rules.") }
+        List<String> clashes = rulesTables.collectMany { String rulesEntity, String table ->
+            tableByEntity.findAll { it.key != rulesEntity && it.value == table }.collect { "${rulesEntity} and ${it.key} share ${table}".toString() } }
+
+        then: "the component has its 17 entities, each on a table of its own named RULES_"
+        rulesTables.size() == 17
+        rulesTables.values().every { it.startsWith("RULES_") }
+        clashes == []
     }
 
     def "an entity filter keeps a filtered user to the decisions it allows"() {

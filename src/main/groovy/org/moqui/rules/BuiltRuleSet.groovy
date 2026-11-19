@@ -16,6 +16,7 @@ class BuiltRuleSet {
     /** The field of a fact instance that holds the caller's record id. No fact field may have this name. */
     static final String RECORD_ID_FIELD = "_recordId"
     static final int MIN_RULE_FIRINGS = 1000
+    /** Firings allowed per fact: at least this many, and at least two per rule, so many rules matching every fact pass. */
     static final int RULE_FIRINGS_PER_FACT = 20
     static final long TIME_LIMIT_MS = 30_000L
 
@@ -25,15 +26,20 @@ class BuiltRuleSet {
     final KieBase kieBase
     final Map<String, PrototypeFact> prototypes
     final List<String> directFactTypeIds
+    final int ruleCount
 
-    BuiltRuleSet(String ruleSetId, KieBase kieBase, Map<String, PrototypeFact> prototypes, List<String> directFactTypeIds) {
+    BuiltRuleSet(String ruleSetId, KieBase kieBase, Map<String, PrototypeFact> prototypes, List<String> directFactTypeIds, int ruleCount) {
         this.ruleSetId = ruleSetId
         this.kieBase = kieBase
         this.prototypes = prototypes
         this.directFactTypeIds = directFactTypeIds
+        this.ruleCount = ruleCount
     }
 
-    static int ruleFiringCap(int factCount) { return Math.max(MIN_RULE_FIRINGS, RULE_FIRINGS_PER_FACT * factCount) }
+    static int ruleFiringCap(int factCount, int ruleCount) {
+        long cap = (long) factCount * Math.max(RULE_FIRINGS_PER_FACT, 2 * ruleCount)
+        return (int) Math.min(Integer.MAX_VALUE, Math.max(MIN_RULE_FIRINGS, cap))
+    }
 
     /** Judges facts, each a Map of factTypeId, fact and an optional recordId. Gives matchedRules and outcomes over all
      *  facts, and decisions: one per fact of the decision's single direct fact type, in input order. */
@@ -43,7 +49,7 @@ class BuiltRuleSet {
         // the input facts of the grouped fact type, by identity, so a fact without a record id still gets its own answer
         Map<PrototypeFactInstance, Integer> groupIndexes = new IdentityHashMap<>()
         List<Map> decisions = []
-        int firingCap = ruleFiringCap(facts.size())
+        int firingCap = ruleFiringCap(facts.size(), ruleCount)
         AtomicBoolean timedOut = new AtomicBoolean(false)
         KieSession session = kieBase.newKieSession()
         ScheduledFuture haltTask = null

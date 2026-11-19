@@ -9,6 +9,7 @@ class BatchEvaluateTests extends Specification {
     @Shared String typesRuleSetId = "RULES_TEST_BATCH_TYPES"
     @Shared String chainRuleSetId = "RULES_TEST_BATCH_CHAIN"
     @Shared String pairRuleSetId = "RULES_TEST_BATCH_PAIR"
+    @Shared String manyRulesRuleSetId = "RULES_TEST_BATCH_MANY_RULES"
     @Shared List<String> extraFactTypeIds = ["batchTestA", "batchTestB", "batchTestC", "batchStep"]
 
     def setupSpec() {
@@ -19,6 +20,7 @@ class BatchEvaluateTests extends Specification {
         removeDecision(typesRuleSetId)
         removeDecision(chainRuleSetId)
         removeDecision(pairRuleSetId)
+        removeDecision(manyRulesRuleSetId)
         removeExtraFactTypes()
 
         createDecision(ruleSetId, ["checkResult"])
@@ -57,6 +59,7 @@ class BatchEvaluateTests extends Specification {
         removeDecision(typesRuleSetId)
         removeDecision(chainRuleSetId)
         removeDecision(pairRuleSetId)
+        removeDecision(manyRulesRuleSetId)
         removeExtraFactTypes()
         ec.artifactExecution.enableAuthz()
         ec.user.logoutUser()
@@ -212,5 +215,20 @@ class BatchEvaluateTests extends Specification {
         out.outcomes == ["SWITCH_ON"]
         followOn.recordIds == [batchTestA: "A1", batchTestB: "B1"]
         !out.decisions.any { decision -> decision.matchedRules.any { it.ruleName == "after pair" } }
+    }
+
+    def "30 rules that all match 100 facts fire 3,000 times without reaching the firing cap"() {
+        given: "a decision that gives every matching rule's outcome, with 30 rules and no lines"
+        createDecision(manyRulesRuleSetId, ["checkResult"])
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: manyRulesRuleSetId, firstMatchOnly: "N"]).update()
+        (1..30).each { storeRule(manyRulesRuleSetId, "always ${it}".toString(), it, "PUT_BACK", []) }
+
+        when:
+        Map out = evaluate((1..100).collect { [factTypeId: "checkResult", recordId: "R$it", fact: [refusedCount: 5]] }, manyRulesRuleSetId)
+
+        then:
+        !ec.message.hasError()
+        out.matchedRules.size() == 3000
+        out.decisions.every { it.matchedRules.size() == 30 && it.outcomes == ["PUT_BACK"] }
     }
 }

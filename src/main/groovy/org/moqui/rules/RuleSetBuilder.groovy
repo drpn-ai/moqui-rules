@@ -41,7 +41,7 @@ class RuleSetBuilder {
         List<Map> rules = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId)
                 .useCache(false).disableAuthz().listMaster("default")
         for (Map rule in rules) model.addRule(buildRule(rule))
-        return new BuiltRuleSet(ruleSetId, KieBaseBuilder.createKieBaseFromModel(model), prototypes, directFactTypeIds)
+        return new BuiltRuleSet(ruleSetId, KieBaseBuilder.createKieBaseFromModel(model), prototypes, directFactTypeIds, rules.size())
     }
 
     private Rule buildRule(Map rule) {

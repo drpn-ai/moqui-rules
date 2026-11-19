@@ -50,15 +50,16 @@ class ValueChecks {
         if (left == null || right == null) return Objects.equals(left, right)
         BigDecimal leftNumber = toBigDecimal(left), rightNumber = toBigDecimal(right)
         if (leftNumber != null && rightNumber != null) return leftNumber.compareTo(rightNumber) == 0
-        return Objects.equals(left, right) || left.toString().trim() == right.toString().trim()
+        // text is compared exactly, as Darpan compares it: "SKU1 " is not "SKU1"
+        return Objects.equals(left, right) || left.toString() == right.toString()
     }
 
-    /** Numbers as BigDecimal, null before everything, anything else as text. */
+    /** Numbers as BigDecimal, null before everything, anything else as exact text. */
     static int compareValues(Object left, Object right) {
         if (left == null || right == null) return left == right ? 0 : (left == null ? -1 : 1)
         BigDecimal leftNumber = toBigDecimal(left), rightNumber = toBigDecimal(right)
         if (leftNumber != null && rightNumber != null) return leftNumber.compareTo(rightNumber)
-        return left.toString().trim() <=> right.toString().trim()
+        return left.toString() <=> right.toString()
     }
 
     static BigDecimal toBigDecimal(Object value) {

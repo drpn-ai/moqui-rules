@@ -97,8 +97,9 @@
 
     <service verb="store" noun="Piece" authenticate="true">
         <description>Record a named piece, a condition written once and used by many rules through a line of type RCT_PIECE,
-            or change it in place when the piece exists. Its lines are checked against its own fact type, and a piece that
-            uses itself, directly or through other pieces, is refused with the chain. Rules using it are rebuilt on their
+            or change it in place when the piece exists. Its top lines read its own fact type, and an exists line under it
+            the item types reached through its list fields; a piece that uses itself, directly or through other pieces, is
+            refused with the chain. Rules using it are rebuilt on their
             next call. A refusal reports every problem together and saves nothing.</description>
         <in-parameters>
             <parameter name="pieceId" required="true"/>
@@ -117,8 +118,10 @@
                 <script>problems.add("Fact type ${factTypeId} does not exist".toString())</script></if>
             <if condition="!conditions"><script>problems.add("A piece needs at least one line")</script></if>
             <if condition="pieceFactType != null &amp;&amp; conditions">
+                <service-call name="moqui.rules.RuleServices.get#DecisionFactTypes" in-map="[directFactTypeIds: [factTypeId]]"
+                        out-map="pieceFactTypes" out-map-add-to-existing="false"/>
                 <service-call name="moqui.rules.RuleLineServices.prepare#RuleLines" out-map="preparedLines"
-                        in-map="[ruleName: 'piece ' + pieceId, conditions: conditions, readFactTypeIds: [factTypeId],
+                        in-map="[ruleName: 'piece ' + pieceId, conditions: conditions, readFactTypeIds: pieceFactTypes.factTypeIds,
                             directFactTypeIds: [factTypeId], pieceChain: [pieceId]]"/>
                 <script>problems.addAll(preparedLines.problems)</script>
                 <if condition="!problems &amp;&amp; preparedLines.factMatches.keySet() != [factTypeId] as Set">
@@ -180,7 +183,9 @@
         <description>Drop built decisions that a changed row can have made stale, and no others. A ruleSetId names its
             decision; a ruleId its rule's decision; a pieceId every decision with a rule using the piece, directly or through
             other pieces; a factTypeId every decision reading the fact type, directly or through a list field; a condition or
-            action type, every decision. A rule row already gone with no ruleSetId given drops every decision; a piece or fact type nobody uses drops none.</description>
+            action type, every decision. A rule row already gone with no ruleSetId given drops every decision; a piece or fact type nobody uses drops none.
+            The same decisions are dropped again when the caller's transaction ends, committed or rolled back, so a build made
+            meanwhile from the old committed rows, or from rows that roll back, is not kept.</description>
         <in-parameters>
             <parameter name="ruleSetId"/><parameter name="ruleId"/><parameter name="pieceId"/><parameter name="factTypeId"/>
             <parameter name="conditionTypeId"/><parameter name="actionTypeId"/>
@@ -221,24 +226,28 @@
                 <script>affected.addAll(readers*.ruleSetId)</script>
             </if>
             <set field="ruleSets" from="ec.getTool('Rules', org.moqui.rules.RuleSets.class)"/>
-            <if condition="clearAll"><script>ruleSets.forget(null)</script><else><script>ruleSets.forget(affected)</script></else></if>
+            <script>ruleSets.forgetNowAndAtTransactionEnd(clearAll ? null : affected)</script>
         </actions>
     </service>
 
     <service verb="get" noun="DecisionFactTypes" authenticate="anonymous-all" allow-remote="false">
         <description>The fact types a decision reads: directly, from its RuleSetFactType rows, and through their list
-            fields, whose item types it reads too.</description>
+            fields, whose item types it reads too. Without a ruleSetId, the fact types read from the given direct ones.</description>
         <in-parameters>
-            <parameter name="ruleSetId" required="true"/>
+            <parameter name="ruleSetId"/>
+            <parameter name="directFactTypeIds" type="List"><description>Used when no ruleSetId is given.</description></parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="directFactTypeIds" type="List"/>
             <parameter name="factTypeIds" type="List"><description>The direct fact types, then the item types reached through list fields.</description></parameter>
         </out-parameters>
         <actions>
-            <entity-find entity-name="rules.RuleSetFactType" list="readFactTypes" disable-authz="true">
-                <econdition field-name="ruleSetId"/></entity-find>
-            <set field="directFactTypeIds" from="readFactTypes*.factTypeId"/>
+            <if condition="ruleSetId">
+                <entity-find entity-name="rules.RuleSetFactType" list="readFactTypes" disable-authz="true">
+                    <econdition field-name="ruleSetId"/></entity-find>
+                <set field="directFactTypeIds" from="readFactTypes*.factTypeId"/>
+                <else><set field="directFactTypeIds" from="(directFactTypeIds ?: []).collect()"/></else>
+            </if>
             <set field="factTypeIds" from="[]"/>
             <set field="waiting" from="directFactTypeIds.collect()"/>
             <while condition="waiting">
@@ -367,8 +376,9 @@
     <service verb="explain" noun="RuleSet" authenticate="true">
         <description>Say, for one fact, whether each rule of a decision holds and whether each line of each rule does. The
             lines are prepared by the same service the decision builder uses and judged with the same checks, so a rule is
-            matched here exactly when evaluate#RuleSet would match it for this fact. No rules session is built. The decision
-            must read one fact type directly.</description>
+            matched here exactly when evaluate#RuleSet would match it for this fact. No rules session is built, so nothing
+            chains: a rule that matches only a fact another rule adds shows as matched in evaluate#RuleSet, not here. The
+            decision must read one fact type directly.</description>
         <in-parameters>
             <parameter name="ruleSetId" required="true"/>
             <parameter name="factTypeId" required="true"/>

@@ -2,6 +2,7 @@ import spock.lang.*
 import org.moqui.context.ExecutionContext
 import org.moqui.Moqui
 import org.moqui.entity.EntityCondition
+import org.moqui.rules.BuiltRuleSet
 import org.moqui.rules.RuleSets
 
 class CacheClearTests extends Specification {
@@ -133,5 +134,64 @@ class CacheClearTests extends Specification {
         cleanup:
         ec.entity.find("rules.FactField").condition("factTypeId", "RULES_TEST_CACHE_UNREAD").deleteAll()
         ec.entity.find("rules.FactType").condition("factTypeId", "RULES_TEST_CACHE_UNREAD").deleteAll()
+    }
+
+    def "a decision built inside a writer's transaction that then rolls back is not kept"() {
+        given: built("RULES_TEST_CACHE_D3")
+        when: "a rule change is made, the decision is built from the uncommitted rows, and the change rolls back"
+        boolean began = ec.transaction.begin(null)
+        storeRule("RULES_TEST_CACHE_D1", "uses piece", 10, compare("01", "netsuite_status", "ENTCO_EQUALS", "Rolled back"))
+        built("RULES_TEST_CACHE_D1")
+        boolean cachedInside = isCached("RULES_TEST_CACHE_D1")
+        ec.transaction.rollback(began, "spec rolls the change back", null)
+
+        then: "the build of rows that never committed is dropped when the transaction ends; an unrelated decision stays"
+        began
+        cachedInside
+        !isCached("RULES_TEST_CACHE_D1")
+        isCached("RULES_TEST_CACHE_D3")
+    }
+
+    def "a decision built inside a writer's transaction is dropped again when it commits"() {
+        given: built("RULES_TEST_CACHE_D3")
+        when:
+        boolean began = ec.transaction.begin(null)
+        storeRule("RULES_TEST_CACHE_D1", "uses piece", 10, piece("P"))
+        built("RULES_TEST_CACHE_D1")
+        boolean cachedInside = isCached("RULES_TEST_CACHE_D1")
+        ec.transaction.commit(began)
+
+        then:
+        began
+        cachedInside
+        !isCached("RULES_TEST_CACHE_D1")
+        isCached("RULES_TEST_CACHE_D3")
+    }
+
+    def "a build that a forget overtakes is not kept"() {
+        given: "a build that is forgotten while it runs, as when a rule changes during a slow build"
+        RuleSets rules = (RuleSets) ec.getTool("Rules", RuleSets.class)
+        rules.forget(["RULES_TEST_CACHE_D2"])
+        RuleSets racing = new RuleSets(ec.factory) {
+            @Override protected BuiltRuleSet buildNow(String ruleSetId) {
+                BuiltRuleSet stale = super.buildNow(ruleSetId)
+                if (ruleSetId == "RULES_TEST_CACHE_D2") forget([ruleSetId])
+                return stale
+            }
+        }
+
+        when:
+        BuiltRuleSet answered = racing.builtRuleSet("RULES_TEST_CACHE_D2")
+
+        then: "the caller still gets its answer, but the stale build is not cached"
+        answered != null
+        !isCached("RULES_TEST_CACHE_D2")
+
+        when: "a build nobody overtakes"
+        rules.forget(["RULES_TEST_CACHE_D3"])
+        racing.builtRuleSet("RULES_TEST_CACHE_D3")
+
+        then:
+        isCached("RULES_TEST_CACHE_D3")
     }
 }

@@ -16,6 +16,7 @@ class PieceTests extends Specification {
         removeAll()
         ec.entity.makeValue("rules.FactType").setAll([factTypeId: factTypeId]).create()
         ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "netsuite_status", valueTypeEnumId: "FVT_TEXT"]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "hotwax_status", valueTypeEnumId: "FVT_TEXT"]).create()
         ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "N"]).create()
         ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
         ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: "FAILS"]).create()
@@ -29,7 +30,7 @@ class PieceTests extends Specification {
     }
 
     void removeAll() {
-        List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", ruleSetId).list()*.ruleId
+        List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", "in", [ruleSetId, otherRuleSetId]).list()*.ruleId
         if (ruleIds) {
             ec.entity.find("rules.RuleSetCondition").condition("ruleId", "in", ruleIds)
                     .condition("parentConditionSeqId", EntityCondition.ComparisonOperator.IS_NOT_NULL, null).deleteAll()
@@ -37,7 +38,7 @@ class PieceTests extends Specification {
                 ec.entity.find("rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
         }
         for (String entityName in ["RuleSetOutcome", "RuleSetFactType", "RuleSet"])
-            ec.entity.find("rules." + entityName).condition("ruleSetId", ruleSetId).deleteAll()
+            ec.entity.find("rules." + entityName).condition("ruleSetId", "in", [ruleSetId, otherRuleSetId]).deleteAll()
         // pieces last-written first would not matter: lines go before their pieces
         List<String> pieceIds = ec.entity.find("rules.RulePiece").condition("pieceId", EntityCondition.ComparisonOperator.LIKE, "RULES_TEST_%").list()*.pieceId
         if (pieceIds) {
@@ -76,20 +77,21 @@ class PieceTests extends Specification {
         assert storePieceErrors(name, pieceFactTypeId, lines) == []
     }
 
-    List<String> storeErrors(Map line) {
+    List<String> storeErrors(Object line, String decisionId = ruleSetId) {
+        List<Map> lines = line instanceof List ? (List<Map>) line : [(Map) line + [conditionSeqId: "01"]]
         ec.message.clearAll()
-        ec.service.sync().name("moqui.rules.RuleServices.store#Rule").parameters([ruleSetId: ruleSetId, ruleName: "piece rule",
-                priority: 10, conditions: [line + [conditionSeqId: "01"]],
+        ec.service.sync().name("moqui.rules.RuleServices.store#Rule").parameters([ruleSetId: decisionId, ruleName: "piece rule",
+                priority: 10, conditions: lines,
                 actions: [[actionTypeId: "RAT_OUTCOME", outcomeId: "FAILS"]]]).call()
         List<String> errors = ec.message.errors.collect()
         ec.message.clearAll()
         return errors
     }
 
-    List<String> outcomeFor(Map line, Map fact) {
-        assert storeErrors(line) == []
+    List<String> outcomeFor(Object line, Map fact, String decisionId = ruleSetId, String factFactTypeId = factTypeId) {
+        assert storeErrors(line, decisionId) == []
         Map result = ec.service.sync().name("moqui.rules.RuleServices.evaluate#RuleSet")
-                .parameters([ruleSetId: ruleSetId, facts: [[factTypeId: factTypeId, fact: fact]]]).call()
+                .parameters([ruleSetId: decisionId, facts: [[factTypeId: factFactTypeId, fact: fact]]]).call()
         assert !ec.message.hasError(), ec.message.errorsString
         return result.outcomes
     }
@@ -150,5 +152,36 @@ class PieceTests extends Specification {
         expect:
         storeErrors(piece("USED")) == []
         ec.entity.find("rules.RuleSetConditionPieceUse").condition("pieceId", id("USED")).list()*.ruleSetId == [ruleSetId]
+    }
+
+    def "a piece with an exists line saves, and a rule using it matches when some item matches"() {
+        given: "a decision that reads sales orders, whose items are order items"
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: otherRuleSetId, firstMatchOnly: "N"]).create()
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: otherRuleSetId, factTypeId: "salesOrder"]).create()
+        ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: otherRuleSetId, outcomeId: "FAILS"]).create()
+
+        when:
+        List<String> errors = storePieceErrors("HAS_DIGITAL", "salesOrder", [
+                [conditionSeqId: "01", conditionTypeId: "RCT_EXISTS", factTypeId: "salesOrder", fieldName: "items"],
+                [conditionSeqId: "02", parentConditionSeqId: "01", conditionTypeId: "RCT_COMPARE", factTypeId: "orderItem",
+                 fieldName: "productTypeId", operatorEnumId: "ENTCO_EQUALS", compareValue: "DIGITAL_GOOD"]])
+
+        then:
+        errors == []
+        outcomeFor(piece("HAS_DIGITAL"), [orderId: "P1", items: [[orderItemSeqId: "01", productTypeId: "DIGITAL_GOOD"]]],
+                otherRuleSetId, "salesOrder") == ["FAILS"]
+        outcomeFor(piece("HAS_DIGITAL"), [orderId: "P2", items: [[orderItemSeqId: "01", productTypeId: "FINISHED_GOOD"]]],
+                otherRuleSetId, "salesOrder") == []
+    }
+
+    def "a not line over a one-line piece with a compare-two-fields line fires exactly when the line does not hold"() {
+        given:
+        storePiece("SAME_STATUS", factTypeId, [[conditionSeqId: "01", conditionTypeId: "RCT_COMPARE_FIELD", factTypeId: factTypeId,
+                fieldName: "netsuite_status", operatorEnumId: "ENTCO_EQUALS", compareFieldName: "hotwax_status"]])
+        List<Map> notPiece = [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"], piece("SAME_STATUS") + [conditionSeqId: "02", parentConditionSeqId: "01"]]
+
+        expect:
+        outcomeFor(notPiece, [netsuite_status: "Refunded", hotwax_status: "Completed"]) == ["FAILS"]
+        outcomeFor(notPiece, [netsuite_status: "Refunded", hotwax_status: "Refunded"]) == []
     }
 }

@@ -52,6 +52,12 @@ class CompareFieldLineTests extends Specification {
         [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"], line + [conditionSeqId: "02", parentConditionSeqId: "01"]]
     }
 
+    /** NOT over an ALL with this one line under it. */
+    static List<Map> notAll(Map line) {
+        [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"], [conditionSeqId: "02", parentConditionSeqId: "01", conditionTypeId: "RCT_ALL"],
+         line + [conditionSeqId: "03", parentConditionSeqId: "02"]]
+    }
+
     List<String> storeErrors(Object line) {
         List<Map> lines = line instanceof List ? (List<Map>) line : [(Map) line + [conditionSeqId: "01"]]
         ec.message.clearAll()
@@ -103,6 +109,10 @@ class CompareFieldLineTests extends Specification {
         "not-equals with one side missing differs"         | field("shopify_amount", "ENTCO_NOT_EQUALS", "netsuite_amount")      | [shopify_amount: 10]                                 || ["FAILS"]
         "less-or-equal on equal amounts"                   | field("shopify_amount", "ENTCO_LESS_EQ", "netsuite_amount")         | [shopify_amount: 10, netsuite_amount: 10.0]          || ["FAILS"]
         "greater-or-equal on a smaller left"               | field("shopify_amount", "ENTCO_GREATER_EQ", "netsuite_amount")      | [shopify_amount: 9, netsuite_amount: 10]             || []
+        "text is compared exactly: a trailing space differs" | field("shopify_ids", "ENTCO_EQUALS", "hotwax_ids")              | [shopify_ids: "SKU1 ", hotwax_ids: "SKU1"]           || []
+        "text is compared exactly: same text is equal"     | field("shopify_ids", "ENTCO_EQUALS", "hotwax_ids")                  | [shopify_ids: "SKU1", hotwax_ids: "SKU1"]            || ["FAILS"]
+        "not over a one-line all: differing amounts fire"  | notAll(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount"))  | [shopify_amount: 11, netsuite_amount: 12]            || ["FAILS"]
+        "not over a one-line all: equal amounts pass"      | notAll(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount"))  | [shopify_amount: 11, netsuite_amount: 11]            || []
     }
 
     def "a tolerance on anything but equals, an unknown other field, or a list field is refused at save"() {
@@ -113,9 +123,15 @@ class CompareFieldLineTests extends Specification {
         storeErrors(field("shopify_amount", "ENTCO_LIKE", "netsuite_amount")).any { it.contains("ENTCO_LIKE") }
     }
 
+    def "a tolerance that is not a number is refused at save, naming it"() {
+        expect:
+        storeErrors(field("shopify_amount", "ENTCO_EQUALS", "netsuite_amount", "abc")) == ["Condition 01 of rule pair rule: tolerance abc is not a number"]
+    }
+
     def "a compare two fields line with a value check cannot be one choice of an any line"() {
         expect:
         storeErrors([[conditionSeqId: "01", conditionTypeId: "RCT_ANY"], field("shopify_paid", "FPO_REQUIRES", "hotwax_hasPayment") +
-                [conditionSeqId: "02", parentConditionSeqId: "01"]]).any { it.contains("any line") }
+                [conditionSeqId: "02", parentConditionSeqId: "01"]]) ==
+                ["Condition 01 of rule pair rule: a compare-two-fields line cannot be one choice of an any line, write a second rule instead"]
     }
 }

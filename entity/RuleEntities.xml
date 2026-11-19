@@ -2,7 +2,7 @@
 <entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
 
-    <entity entity-name="FactType" package="rules" use="configuration" cache="true">
+    <entity entity-name="FactType" table-name="RULES_FACT_TYPE" package="rules" use="configuration" cache="true">
         <description>One kind of fact that rules read, like checkResult or salesOrder.</description>
         <field name="factTypeId" type="id" is-pk="true"/>
         <field name="description" type="text-medium"/>
@@ -14,7 +14,7 @@
         </master>
     </entity>
 
-    <entity entity-name="FactField" package="rules" use="configuration" cache="true">
+    <entity entity-name="FactField" table-name="RULES_FACT_FIELD" package="rules" use="configuration" cache="true">
         <description>One value in a fact, with its type. Rules are checked against these fields.</description>
         <field name="factTypeId" type="id" is-pk="true"/>
         <field name="fieldName" type="id" is-pk="true"/>
@@ -28,7 +28,7 @@
             <key-map field-name="itemFactTypeId" related="factTypeId"/></relationship>
     </entity>
 
-    <entity entity-name="FactNode" package="rules" use="configuration" cache="true">
+    <entity entity-name="FactNode" table-name="RULES_FACT_NODE" package="rules" use="configuration" cache="true">
         <description>One step of the tree that builds a fact from entity data.</description>
         <field name="factTypeId" type="id" is-pk="true"/>
         <field name="nodeSeqId" type="id" is-pk="true"/>
@@ -54,7 +54,7 @@
             <key-map field-name="factTypeId"/><key-map field-name="nodeSeqId"/></relationship>
     </entity>
 
-    <entity entity-name="FactNodeCondition" package="rules" use="configuration" cache="true">
+    <entity entity-name="FactNodeCondition" table-name="RULES_FACT_NODE_CONDITION" package="rules" use="configuration" cache="true">
         <description>Says which rows a record, list or count node reads.</description>
         <field name="factTypeId" type="id" is-pk="true"/>
         <field name="nodeSeqId" type="id" is-pk="true"/>
@@ -69,7 +69,7 @@
             <key-map field-name="operatorEnumId" related="enumId"/></relationship>
     </entity>
 
-    <entity entity-name="RuleSet" package="rules" use="configuration">
+    <entity entity-name="RuleSet" table-name="RULES_RULE_SET" package="rules" use="configuration">
         <description>One decision, like SWITCH_ON_A_JOB.</description>
         <field name="ruleSetId" type="id" is-pk="true"/>
         <field name="description" type="text-medium" enable-audit-log="true"/>
@@ -79,7 +79,7 @@
         <relationship type="many" related="rules.RuleSetRule" short-alias="rules"><key-map field-name="ruleSetId"/></relationship>
     </entity>
 
-    <entity entity-name="RuleSetFactType" package="rules" use="configuration">
+    <entity entity-name="RuleSetFactType" table-name="RULES_RULE_SET_FACT_TYPE" package="rules" use="configuration">
         <description>A fact type a decision reads.</description>
         <field name="ruleSetId" type="id" is-pk="true"/>
         <field name="factTypeId" type="id" is-pk="true"/>
@@ -87,7 +87,7 @@
         <relationship type="one" related="rules.FactType"/>
     </entity>
 
-    <entity entity-name="RuleSetOutcome" package="rules" use="configuration">
+    <entity entity-name="RuleSetOutcome" table-name="RULES_RULE_SET_OUTCOME" package="rules" use="configuration">
         <description>One result in the fixed list a decision can give.</description>
         <field name="ruleSetId" type="id" is-pk="true"/>
         <field name="outcomeId" type="id" is-pk="true"/>
@@ -95,7 +95,7 @@
         <relationship type="one" related="rules.RuleSet"/>
     </entity>
 
-    <entity entity-name="RuleSetRule" package="rules" use="configuration">
+    <entity entity-name="RuleSetRule" table-name="RULES_RULE_SET_RULE" package="rules" use="configuration">
         <description>One rule of a decision. A change edits it in place; the entity audit log keeps the old values.</description>
         <field name="ruleId" type="id" is-pk="true"/>
         <field name="ruleSetId" type="id" enable-audit-log="true"/>
@@ -106,15 +106,15 @@
         <relationship type="one" related="rules.RuleSet"/>
         <relationship type="many" related="rules.RuleSetCondition" short-alias="conditions"><key-map field-name="ruleId"/></relationship>
         <relationship type="many" related="rules.RuleSetAction" short-alias="actions"><key-map field-name="ruleId"/></relationship>
-        <index name="RULE_SET_RULE_NAME" unique="true"><index-field name="ruleSetId"/><index-field name="ruleName"/></index>
-        <index name="RULE_SET_RULE_PRIORITY" unique="true"><index-field name="ruleSetId"/><index-field name="priority"/></index>
+        <index name="RULES_RULE_NAME" unique="true"><index-field name="ruleSetId"/><index-field name="ruleName"/></index>
+        <index name="RULES_RULE_PRIORITY" unique="true"><index-field name="ruleSetId"/><index-field name="priority"/></index>
         <master>
             <detail relationship="conditions"><detail relationship="conditionType"/></detail>
             <detail relationship="actions"><detail relationship="actionType"/><detail relationship="fields"/></detail>
         </master>
     </entity>
 
-    <entity entity-name="RuleConditionType" package="rules" use="configuration" cache="true">
+    <entity entity-name="RuleConditionType" table-name="RULES_RULE_CONDITION_TYPE" package="rules" use="configuration" cache="true">
         <description>One kind of "when" line, like compare a field or all lines match, with the service that checks a line of
             this kind and turns it into a Moqui condition.</description>
         <field name="conditionTypeId" type="id" is-pk="true"/>
@@ -122,7 +122,7 @@
         <field name="prepareServiceName" type="text-medium"><description>Implements moqui.rules.RuleLineServices.prepare#RuleLine.</description></field>
     </entity>
 
-    <entity entity-name="RuleSetCondition" package="rules" use="configuration">
+    <entity entity-name="RuleSetCondition" table-name="RULES_RULE_SET_CONDITION" package="rules" use="configuration">
         <description>One "when" line of a rule.</description>
         <field name="ruleId" type="id" is-pk="true"/>
         <field name="conditionSeqId" type="id" is-pk="true"/>
@@ -153,7 +153,7 @@
         <alias name="ruleName" entity-alias="RSR"/>
     </view-entity>
 
-    <entity entity-name="RulePiece" package="rules" use="configuration">
+    <entity entity-name="RulePiece" table-name="RULES_RULE_PIECE" package="rules" use="configuration">
         <description>A named piece: a condition written once and used by many rules, through a line of type RCT_PIECE.</description>
         <field name="pieceId" type="id" is-pk="true"/>
         <field name="description" type="text-medium" enable-audit-log="true"/>
@@ -162,7 +162,7 @@
         <relationship type="one" related="rules.FactType"/>
         <relationship type="many" related="rules.RulePieceCondition" short-alias="conditions"><key-map field-name="pieceId"/></relationship>
     </entity>
-    <entity entity-name="RulePieceCondition" package="rules" use="configuration">
+    <entity entity-name="RulePieceCondition" table-name="RULES_RULE_PIECE_CONDITION" package="rules" use="configuration">
         <description>One line of a named piece, with the same columns as a "when" line of a rule.</description>
         <field name="pieceId" type="id" is-pk="true"/>
         <field name="conditionSeqId" type="id" is-pk="true"/>
@@ -194,7 +194,7 @@
         <entity-condition><econdition entity-alias="RSC" field-name="conditionTypeId" value="RCT_PIECE"/></entity-condition>
     </view-entity>
 
-    <entity entity-name="RuleActionType" package="rules" use="configuration" cache="true">
+    <entity entity-name="RuleActionType" table-name="RULES_RULE_ACTION_TYPE" package="rules" use="configuration" cache="true">
         <description>One kind of "then" part, like return an outcome or add a fact, with the service that checks an action of
             this kind and gives what the decision needs from it.</description>
         <field name="actionTypeId" type="id" is-pk="true"/>
@@ -202,7 +202,7 @@
         <field name="prepareServiceName" type="text-medium"><description>Implements moqui.rules.RuleActionServices.prepare#RuleAction.</description></field>
     </entity>
 
-    <entity entity-name="RuleSetAction" package="rules" use="configuration">
+    <entity entity-name="RuleSetAction" table-name="RULES_RULE_SET_ACTION" package="rules" use="configuration">
         <description>The "then" part of a rule: return an outcome, or add a new fact.</description>
         <field name="ruleId" type="id" is-pk="true"/>
         <field name="actionSeqId" type="id" is-pk="true"/>
@@ -219,7 +219,7 @@
             <key-map field-name="ruleId"/><key-map field-name="actionSeqId"/></relationship>
     </entity>
 
-    <entity entity-name="RuleSetActionField" package="rules" use="configuration">
+    <entity entity-name="RuleSetActionField" table-name="RULES_RULE_SET_ACTION_FIELD" package="rules" use="configuration">
         <description>One value of the new fact an action adds.</description>
         <field name="ruleId" type="id" is-pk="true"/>
         <field name="actionSeqId" type="id" is-pk="true"/>
@@ -228,7 +228,7 @@
         <relationship type="one" related="rules.RuleSetAction">
             <key-map field-name="ruleId"/><key-map field-name="actionSeqId"/></relationship>
     </entity>
-    <entity entity-name="FileCheck" package="rules" use="transactional">
+    <entity entity-name="FileCheck" table-name="RULES_FILE_CHECK" package="rules" use="transactional">
         <description>One check of a file against a decision, kept so the Rule Author can review or download its outcomes.</description>
         <field name="fileCheckId" type="id" is-pk="true"/>
         <field name="ruleSetId" type="id"/>
@@ -245,7 +245,7 @@
         <relationship type="many" related="rules.FileCheckRecord" short-alias="records"><key-map field-name="fileCheckId"/></relationship>
     </entity>
 
-    <entity entity-name="FileCheckRecord" package="rules" use="transactional">
+    <entity entity-name="FileCheckRecord" table-name="RULES_FILE_CHECK_RECORD" package="rules" use="transactional">
         <description>One record of a checked file, with its outcomes or the reasons it was refused.</description>
         <field name="fileCheckId" type="id" is-pk="true"/>
         <field name="recordNumber" type="number-integer" is-pk="true"/>

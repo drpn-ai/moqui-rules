@@ -154,9 +154,13 @@
             <set field="matches" from="[condition: conditionFactory.makeCondition(inner*.matches*.condition, org.moqui.entity.EntityCondition.AND),
                     itemChecks: inner.collectMany { it.matches.itemChecks },
                     valueChecks: inner.collectMany { it.matches.valueChecks ?: [] }]"/>
-            <if condition="inner.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks &amp;&amp; !it.notMatches.valueChecks }">
-                <set field="notMatches" from="[condition: conditionFactory.makeCondition(inner*.notMatches*.condition,
-                        org.moqui.entity.EntityCondition.OR), itemChecks: [], valueChecks: []]"/>
+            <!-- one line turns around as itself; several only when each is a plain condition, as their OR -->
+            <if condition="inner.size() == 1">
+                <set field="notMatches" from="inner[0].notMatches"/>
+                <else-if condition="inner.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks &amp;&amp; !it.notMatches.valueChecks }">
+                    <set field="notMatches" from="[condition: conditionFactory.makeCondition(inner*.notMatches*.condition,
+                            org.moqui.entity.EntityCondition.OR), itemChecks: [], valueChecks: []]"/>
+                </else-if>
             </if>
         </actions>
     </service>
@@ -267,20 +271,26 @@
             </iterate>
 
             <set field="hasToleranceValue" from="line.tolerance != null &amp;&amp; line.tolerance.toString().trim() != ''"/>
+            <set field="toleranceNumber" from="null"/>
             <if condition="hasToleranceValue">
-                <if condition="line.operatorEnumId != 'ENTCO_EQUALS'">
-                    <script>problems.add("a tolerance only goes with the equals operator".toString())</script>
-                    <else-if condition="(line.tolerance as BigDecimal) &lt; 0">
+                <service-call name="moqui.rules.FactValueServices.convert#FactValue" out-map="convertedTolerance" out-map-add-to-existing="false"
+                        in-map="[valueTypeEnumId: 'FVT_DECIMAL', value: line.tolerance]"/>
+                <set field="toleranceNumber" from="convertedTolerance.convertedValue"/>
+                <if condition="convertedTolerance.problem">
+                    <script>problems.add("tolerance ${line.tolerance} is not a number".toString())</script>
+                    <else-if condition="line.operatorEnumId != 'ENTCO_EQUALS'">
+                        <script>problems.add("a tolerance only goes with the equals operator".toString())</script></else-if>
+                    <else-if condition="toleranceNumber &lt; 0">
                         <script>problems.add("the tolerance cannot be negative".toString())</script></else-if>
                 </if>
             </if>
             <if condition="problems"><return/></if>
 
             <!-- a tolerance of 0 is no tolerance: plain equality -->
-            <set field="hasTolerance" from="hasToleranceValue &amp;&amp; (line.tolerance as BigDecimal) &gt; 0"/>
+            <set field="hasTolerance" from="toleranceNumber != null &amp;&amp; toleranceNumber &gt; 0"/>
             <set field="conditionFactory" from="ec.entity.conditionFactory"/>
             <set field="check" from="[kind: hasTolerance ? 'equals within' : pairKinds.get(line.operatorEnumId), fieldName: line.fieldName,
-                    compareFieldName: line.compareFieldName, tolerance: hasTolerance ? (line.tolerance as BigDecimal) : null]"/>
+                    compareFieldName: line.compareFieldName, tolerance: hasTolerance ? toleranceNumber : null]"/>
             <set field="matches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: true]]]"/>
             <set field="notMatches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: false]]]"/>
         </actions>
@@ -301,9 +311,13 @@
             <set field="matches" from="[condition: conditionFactory.makeCondition(childLines*.matches*.condition, org.moqui.entity.EntityCondition.AND),
                     itemChecks: childLines.collectMany { it.matches.itemChecks },
                     valueChecks: childLines.collectMany { it.matches.valueChecks ?: [] }]"/>
-            <if condition="childLines.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks &amp;&amp; !it.notMatches.valueChecks }">
-                <set field="notMatches" from="[condition: conditionFactory.makeCondition(childLines*.notMatches*.condition,
-                        org.moqui.entity.EntityCondition.OR), itemChecks: [], valueChecks: []]"/>
+            <!-- one line turns around as itself; several only when each is a plain condition, as their OR -->
+            <if condition="childLines.size() == 1">
+                <set field="notMatches" from="childLines[0].notMatches"/>
+                <else-if condition="childLines.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks &amp;&amp; !it.notMatches.valueChecks }">
+                    <set field="notMatches" from="[condition: conditionFactory.makeCondition(childLines*.notMatches*.condition,
+                            org.moqui.entity.EntityCondition.OR), itemChecks: [], valueChecks: []]"/>
+                </else-if>
             </if>
         </actions>
     </service>
@@ -323,7 +337,7 @@
                 <return/>
             </if>
             <if condition="childLines.any { it.matches.valueChecks }">
-                <script>problems.add("a compare two fields line with a tolerance, requires, required by, all in or contains all cannot be one choice of an any line, write a second rule instead")</script>
+                <script>problems.add("a compare-two-fields line cannot be one choice of an any line, write a second rule instead")</script>
                 <return/>
             </if>
 
