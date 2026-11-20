@@ -6,7 +6,7 @@ import org.moqui.rules.RuleSets
 class ComponentBootTests extends Specification {
     @Shared ExecutionContext ec
 
-    def setupSpec() { ec = Moqui.getExecutionContext(); ec.user.internalLoginUser("john.doe"); RulesTestData.ensureLoaded(ec) }
+    def setupSpec() { ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec); ec.user.internalLoginUser("john.doe") }
     def cleanupSpec() { if (ec != null) ec.destroy() }
 
     def "Moqui starts with the moqui-rules component loaded"() {

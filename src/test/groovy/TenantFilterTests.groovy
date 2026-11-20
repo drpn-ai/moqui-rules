@@ -34,7 +34,7 @@ class TenantFilterTests extends Specification {
     ]
 
     def setupSpec() {
-        ec = Moqui.getExecutionContext()
+        ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
         ec.user.internalLoginUser("john.doe")
         ec.artifactExecution.disableAuthz()
         removeTestData()

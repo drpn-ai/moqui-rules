@@ -11,8 +11,12 @@ class RulesTestData {
         if (checked) return
         boolean wasDisabled = ec.artifactExecution.disableAuthz()
         try {
-            if (ec.entity.find("moqui.basic.Enumeration").count() == 0)
-                ec.entity.makeDataLoader().dataTypes(["seed", "seed-initial", "install", "demo"] as Set<String>).load()
+            // Two loads: one load with all four types reads files in path order, so a demo file (RuleDemoData) can run
+            // before the seed file whose enumerations its rows point at, and its rows are refused.
+            if (ec.entity.find("moqui.basic.Enumeration").count() == 0) {
+                ec.entity.makeDataLoader().dataTypes(["seed", "seed-initial", "install"] as Set<String>).load()
+                ec.entity.makeDataLoader().dataTypes(["demo"] as Set<String>).load()
+            }
             if (ec.entity.find("rules.RuleConditionType").condition("conditionTypeId", "RCT_PIECE").count() == 0) {
                 ec.entity.makeDataLoader().location("component://moqui-rules/data/RuleSeedData.xml").load()
                 ec.entity.makeDataLoader().location("component://moqui-rules/data/RuleDemoData.xml").load()
