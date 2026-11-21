@@ -244,8 +244,8 @@
 
     <service verb="prepare" noun="CompareFieldLine" authenticate="anonymous-all" allow-remote="false">
         <implements service="moqui.rules.RuleLineServices.prepare#RuleLine"/>
-        <description>Compare one field of a fact with another field of the same fact. Every operator is a value check
-            with Darpan's semantics (a tolerance of 0 is plain equality).</description>
+        <description>Compare one field of a fact with another field of the same fact. Every operator is a value check,
+            evaluated by the value-check truth table (a tolerance of 0 is plain equality).</description>
         <actions>
             <set field="problems" from="[]"/>
             <set field="factTypeIds" from="[line.factTypeId]"/>

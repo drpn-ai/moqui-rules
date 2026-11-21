@@ -2,8 +2,7 @@ package org.moqui.rules
 
 /**
  * A line that compares one field of a fact with another field of the same fact, when a Moqui condition cannot say it:
- * equals within a tolerance, requires, required by, all in and contains all. The truth table is the one Darpan's
- * reconciliation rules have always used. A side that was not read (null) claims nothing, where noted.
+ * equals within a tolerance, requires, required by, all in and contains all. A side that was not read (null) claims nothing, where noted.
  */
 class ValueChecks {
     /** True when the check, turned around when holds is false, is met by these fact values. */
@@ -50,7 +49,7 @@ class ValueChecks {
         if (left == null || right == null) return Objects.equals(left, right)
         BigDecimal leftNumber = toBigDecimal(left), rightNumber = toBigDecimal(right)
         if (leftNumber != null && rightNumber != null) return leftNumber.compareTo(rightNumber) == 0
-        // text is compared exactly, as Darpan compares it: "SKU1 " is not "SKU1"
+        // text is compared exactly: "SKU1 " is not "SKU1"
         return Objects.equals(left, right) || left.toString() == right.toString()
     }
 

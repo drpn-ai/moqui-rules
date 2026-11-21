@@ -38,7 +38,7 @@ class ExplainTests extends Specification {
         ec.entity.makeValue("rules.FactType").setAll([factTypeId: itemFactTypeId]).create()
         ec.entity.makeValue("rules.FactField").setAll([factTypeId: itemFactTypeId, fieldName: "code", valueTypeEnumId: "FVT_TEXT"]).create()
         ec.entity.makeValue("rules.FactType").setAll([factTypeId: pairFactTypeId]).create()
-        [shopify_paid: "FVT_BOOLEAN", hotwax_hasPayment: "FVT_BOOLEAN", shopify_amount: "FVT_DECIMAL", netsuite_amount: "FVT_DECIMAL"].each { name, type ->
+        [left_paid: "FVT_BOOLEAN", right_hasPayment: "FVT_BOOLEAN", left_amount: "FVT_DECIMAL", right_amount: "FVT_DECIMAL"].each { name, type ->
             ec.entity.makeValue("rules.FactField").setAll([factTypeId: pairFactTypeId, fieldName: name, valueTypeEnumId: type]).create() }
         ec.entity.makeValue("rules.FactField").setAll([factTypeId: pairFactTypeId, fieldName: "items", valueTypeEnumId: "FVT_LIST",
                 itemFactTypeId: itemFactTypeId]).create()
@@ -46,9 +46,9 @@ class ExplainTests extends Specification {
         ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: pairRuleSetId, factTypeId: pairFactTypeId]).create()
         ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: pairRuleSetId, factTypeId: itemFactTypeId]).create()
         storeRule(pairRuleSetId, "paid has payment", 30, "SWITCH_ON", [[conditionSeqId: "01", conditionTypeId: "RCT_COMPARE_FIELD",
-                factTypeId: pairFactTypeId, fieldName: "shopify_paid", operatorEnumId: "FPO_REQUIRES", compareFieldName: "hotwax_hasPayment"]])
+                factTypeId: pairFactTypeId, fieldName: "left_paid", operatorEnumId: "FPO_REQUIRES", compareFieldName: "right_hasPayment"]])
         storeRule(pairRuleSetId, "amounts agree", 20, "CHECK_AGAIN", [[conditionSeqId: "01", conditionTypeId: "RCT_COMPARE_FIELD",
-                factTypeId: pairFactTypeId, fieldName: "shopify_amount", operatorEnumId: "ENTCO_EQUALS", compareFieldName: "netsuite_amount", tolerance: 1.00]])
+                factTypeId: pairFactTypeId, fieldName: "left_amount", operatorEnumId: "ENTCO_EQUALS", compareFieldName: "right_amount", tolerance: 1.00]])
         storeRule(pairRuleSetId, "has item a", 10, "PUT_BACK", [
                 [conditionSeqId: "01", conditionTypeId: "RCT_EXISTS", factTypeId: pairFactTypeId, fieldName: "items"],
                 [conditionSeqId: "02", parentConditionSeqId: "01", conditionTypeId: "RCT_COMPARE", factTypeId: itemFactTypeId, fieldName: "code",
@@ -220,10 +220,10 @@ class ExplainTests extends Specification {
     def "compare-two-fields lines say what they compare, whether they hold, and agree with evaluate"() {
         expect:
         List<Map> facts = [
-                [shopify_paid: true, hotwax_hasPayment: true, shopify_amount: 10.00, netsuite_amount: 10.50],
-                [shopify_paid: true, hotwax_hasPayment: false, shopify_amount: 10.00, netsuite_amount: 12.00],
-                [shopify_paid: false, shopify_amount: 10.00],
-                [hotwax_hasPayment: true, netsuite_amount: 10.00],
+                [left_paid: true, right_hasPayment: true, left_amount: 10.00, right_amount: 10.50],
+                [left_paid: true, right_hasPayment: false, left_amount: 10.00, right_amount: 12.00],
+                [left_paid: false, left_amount: 10.00],
+                [right_hasPayment: true, right_amount: 10.00],
                 [:]]
         facts.every { fact ->
             Map out = explain(fact, pairRuleSetId, pairFactTypeId)
@@ -233,9 +233,9 @@ class ExplainTests extends Specification {
         }
         Map first = explain(facts[1], pairRuleSetId, pairFactTypeId)
         first.rules*.ruleName == ["paid has payment", "amounts agree", "has item a"]
-        first.rules[0].lines*.text == ["shopify_paid requires hotwax_hasPayment"]
+        first.rules[0].lines*.text == ["left_paid requires right_hasPayment"]
         first.rules[0].lines*.holds == [false]
-        first.rules[1].lines*.text == ["shopify_amount equals netsuite_amount (within 1)"]  // the tolerance as stored
+        first.rules[1].lines*.text == ["left_amount equals right_amount (within 1)"]  // the tolerance as stored
         first.rules[1].lines*.holds == [false]
         explain(facts[0], pairRuleSetId, pairFactTypeId).rules[1].lines*.holds == [true]
         explain(facts[2], pairRuleSetId, pairFactTypeId).rules[0].lines*.holds == [true]   // unpaid claims nothing

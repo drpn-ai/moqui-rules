@@ -18,7 +18,7 @@ class CacheClearTests extends Specification {
         removeAll()
         for (String typeId in [factTypeId, otherFactTypeId]) {
             ec.entity.makeValue("rules.FactType").setAll([factTypeId: typeId]).create()
-            ec.entity.makeValue("rules.FactField").setAll([factTypeId: typeId, fieldName: "netsuite_status", valueTypeEnumId: "FVT_TEXT"]).create()
+            ec.entity.makeValue("rules.FactField").setAll([factTypeId: typeId, fieldName: "left_status", valueTypeEnumId: "FVT_TEXT"]).create()
         }
         // D1 and D2 read the pair type and use piece P; D3 reads the other type and does not
         for (String ruleSetId in decisionIds) {
@@ -27,7 +27,7 @@ class CacheClearTests extends Specification {
                     factTypeId: ruleSetId.endsWith("D3") ? otherFactTypeId : factTypeId]).create()
             ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: "FAILS"]).create()
         }
-        storePiece("P", [compare("01", "netsuite_status", "ENTCO_EQUALS", "Refunded")])
+        storePiece("P", [compare("01", "left_status", "ENTCO_EQUALS", "Refunded")])
         storeRule("RULES_TEST_CACHE_D1", "uses piece", 10, piece("P"))
         storeRule("RULES_TEST_CACHE_D2", "uses piece", 10, piece("P"))
         storeRule("RULES_TEST_CACHE_D3", "plain", 10, compareOn(otherFactTypeId, "01", "Open"))
@@ -59,7 +59,7 @@ class CacheClearTests extends Specification {
     static String pieceId(String name) { "RULES_TEST_CACHE_" + name }
 
     static Map compareOn(String typeId, String seq, String value) {
-        [conditionSeqId: seq, conditionTypeId: "RCT_COMPARE", factTypeId: typeId, fieldName: "netsuite_status",
+        [conditionSeqId: seq, conditionTypeId: "RCT_COMPARE", factTypeId: typeId, fieldName: "left_status",
          operatorEnumId: "ENTCO_EQUALS", compareValue: value]
     }
 
@@ -90,7 +90,7 @@ class CacheClearTests extends Specification {
 
     def "editing a rule rebuilds its decision and leaves an unrelated decision built"() {
         given: built("RULES_TEST_CACHE_D1"); built("RULES_TEST_CACHE_D2")
-        when: storeRule("RULES_TEST_CACHE_D1", "uses piece", 10, compare("01", "netsuite_status", "ENTCO_EQUALS", "Closed"))
+        when: storeRule("RULES_TEST_CACHE_D1", "uses piece", 10, compare("01", "left_status", "ENTCO_EQUALS", "Closed"))
         then: !isCached("RULES_TEST_CACHE_D1"); isCached("RULES_TEST_CACHE_D2")
     }
 
@@ -98,7 +98,7 @@ class CacheClearTests extends Specification {
         given:
         storeRule("RULES_TEST_CACHE_D1", "uses piece", 10, piece("P"))
         built("RULES_TEST_CACHE_D1"); built("RULES_TEST_CACHE_D2"); built("RULES_TEST_CACHE_D3")
-        when: storePiece("P", [compare("01", "netsuite_status", "ENTCO_EQUALS", "Closed")])
+        when: storePiece("P", [compare("01", "left_status", "ENTCO_EQUALS", "Closed")])
         then: !isCached("RULES_TEST_CACHE_D1"); !isCached("RULES_TEST_CACHE_D2"); isCached("RULES_TEST_CACHE_D3")
     }
 
@@ -107,20 +107,20 @@ class CacheClearTests extends Specification {
         storePiece("OUTER", [piece("P")])
         storeRule("RULES_TEST_CACHE_D2", "uses piece", 10, piece("OUTER"))
         built("RULES_TEST_CACHE_D1"); built("RULES_TEST_CACHE_D2"); built("RULES_TEST_CACHE_D3")
-        when: storePiece("P", [compare("01", "netsuite_status", "ENTCO_EQUALS", "Refunded")])
+        when: storePiece("P", [compare("01", "left_status", "ENTCO_EQUALS", "Refunded")])
         then: !isCached("RULES_TEST_CACHE_D1"); !isCached("RULES_TEST_CACHE_D2"); isCached("RULES_TEST_CACHE_D3")
     }
 
     def "editing a field of a fact type clears the decisions that read it and not an unrelated one"() {
         given: built("RULES_TEST_CACHE_D1"); built("RULES_TEST_CACHE_D2"); built("RULES_TEST_CACHE_D3")
         when: ec.service.sync().name("update#rules.FactField").parameters([factTypeId: factTypeId,
-                fieldName: "netsuite_status", description: "edited"]).call()
+                fieldName: "left_status", description: "edited"]).call()
         then: !isCached("RULES_TEST_CACHE_D1"); !isCached("RULES_TEST_CACHE_D2"); isCached("RULES_TEST_CACHE_D3")
     }
 
     def "creating a piece no rule uses leaves every decision built"() {
         given: built("RULES_TEST_CACHE_D1"); built("RULES_TEST_CACHE_D2"); built("RULES_TEST_CACHE_D3")
-        when: storePiece("UNUSED", [compare("01", "netsuite_status", "ENTCO_EQUALS", "Closed")])
+        when: storePiece("UNUSED", [compare("01", "left_status", "ENTCO_EQUALS", "Closed")])
         then: isCached("RULES_TEST_CACHE_D1"); isCached("RULES_TEST_CACHE_D2"); isCached("RULES_TEST_CACHE_D3")
     }
 
@@ -140,7 +140,7 @@ class CacheClearTests extends Specification {
         given: built("RULES_TEST_CACHE_D3")
         when: "a rule change is made, the decision is built from the uncommitted rows, and the change rolls back"
         boolean began = ec.transaction.begin(null)
-        storeRule("RULES_TEST_CACHE_D1", "uses piece", 10, compare("01", "netsuite_status", "ENTCO_EQUALS", "Rolled back"))
+        storeRule("RULES_TEST_CACHE_D1", "uses piece", 10, compare("01", "left_status", "ENTCO_EQUALS", "Rolled back"))
         built("RULES_TEST_CACHE_D1")
         boolean cachedInside = isCached("RULES_TEST_CACHE_D1")
         ec.transaction.rollback(began, "spec rolls the change back", null)

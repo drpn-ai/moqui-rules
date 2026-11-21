@@ -4,7 +4,7 @@ import org.moqui.Moqui
 import java.sql.Timestamp
 
 /**
- * A host app (Darpan) adds its own entity filters to the component's entities, such as a tenant per row. This spec
+ * A host application adds its own entity filters to the component's entities, such as a tenant per row. This spec
  * proves such a filter on a joined member applies through the component's two views, and that build#Fact answers a
  * caller the filter hides "does not exist" even when another caller built that fact type already.
  */

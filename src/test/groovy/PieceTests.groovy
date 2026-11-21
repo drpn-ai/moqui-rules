@@ -15,8 +15,8 @@ class PieceTests extends Specification {
         ec.artifactExecution.disableAuthz()
         removeAll()
         ec.entity.makeValue("rules.FactType").setAll([factTypeId: factTypeId]).create()
-        ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "netsuite_status", valueTypeEnumId: "FVT_TEXT"]).create()
-        ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "hotwax_status", valueTypeEnumId: "FVT_TEXT"]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "left_status", valueTypeEnumId: "FVT_TEXT"]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "right_status", valueTypeEnumId: "FVT_TEXT"]).create()
         ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "N"]).create()
         ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
         ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: "FAILS"]).create()
@@ -97,15 +97,15 @@ class PieceTests extends Specification {
     }
 
     def "a rule using a piece matches exactly when the piece's lines match"() {
-        given: storePiece("REFUNDED", factTypeId, [compare("01", "netsuite_status", "ENTCO_EQUALS", "Refunded")])
+        given: storePiece("REFUNDED", factTypeId, [compare("01", "left_status", "ENTCO_EQUALS", "Refunded")])
         expect:
-        outcomeFor(piece("REFUNDED"), [netsuite_status: "Refunded"]) == ["FAILS"]
-        outcomeFor(piece("REFUNDED"), [netsuite_status: "Pending Receipt"]) == []
+        outcomeFor(piece("REFUNDED"), [left_status: "Refunded"]) == ["FAILS"]
+        outcomeFor(piece("REFUNDED"), [left_status: "Pending Receipt"]) == []
     }
 
     def "a piece that names itself, directly or through another piece, is refused with the chain"() {
         given:
-        storePiece("P2", factTypeId, [compare("01", "netsuite_status", "ENTCO_EQUALS", "Refunded")])
+        storePiece("P2", factTypeId, [compare("01", "left_status", "ENTCO_EQUALS", "Refunded")])
         storePiece("P1", factTypeId, [piece("P2")])
         expect:
         storePieceErrors("P2", factTypeId, [piece("P1")]).any { it.contains("RULES_TEST_P2 > RULES_TEST_P1 > RULES_TEST_P2") }
@@ -120,12 +120,12 @@ class PieceTests extends Specification {
     }
 
     def "changing a piece changes every decision that uses it on the next call"() {
-        given: storePiece("REFUNDED", factTypeId, [compare("01", "netsuite_status", "ENTCO_EQUALS", "Refunded")])
-        expect: outcomeFor(piece("REFUNDED"), [netsuite_status: "Closed"]) == []
-        when: storePiece("REFUNDED", factTypeId, [compare("01", "netsuite_status", "ENTCO_EQUALS", "Closed")])
+        given: storePiece("REFUNDED", factTypeId, [compare("01", "left_status", "ENTCO_EQUALS", "Refunded")])
+        expect: outcomeFor(piece("REFUNDED"), [left_status: "Closed"]) == []
+        when: storePiece("REFUNDED", factTypeId, [compare("01", "left_status", "ENTCO_EQUALS", "Closed")])
         then:
-        outcomeFor(piece("REFUNDED"), [netsuite_status: "Closed"]) == ["FAILS"]
-        outcomeFor(piece("REFUNDED"), [netsuite_status: "Refunded"]) == []
+        outcomeFor(piece("REFUNDED"), [left_status: "Closed"]) == ["FAILS"]
+        outcomeFor(piece("REFUNDED"), [left_status: "Refunded"]) == []
     }
 
     def "a piece that does not exist, or a piece over an unknown field, is refused and nothing is saved"() {
@@ -138,17 +138,17 @@ class PieceTests extends Specification {
 
     def "a piece nests up to 3 levels but no deeper"() {
         given:
-        storePiece("L1", factTypeId, [compare("01", "netsuite_status", "ENTCO_EQUALS", "Refunded")])
+        storePiece("L1", factTypeId, [compare("01", "left_status", "ENTCO_EQUALS", "Refunded")])
         storePiece("L2", factTypeId, [piece("L1")])
         storePiece("L3", factTypeId, [piece("L2")])
         expect:
         storePieceErrors("L4", factTypeId, [piece("L3")]).any { it.contains("3 levels") }
-        outcomeFor(piece("L3"), [netsuite_status: "Refunded"]) == ["FAILS"]
+        outcomeFor(piece("L3"), [left_status: "Refunded"]) == ["FAILS"]
     }
 
     def "the view finds the rules that use a piece"() {
         given:
-        storePiece("USED", factTypeId, [compare("01", "netsuite_status", "ENTCO_EQUALS", "Refunded")])
+        storePiece("USED", factTypeId, [compare("01", "left_status", "ENTCO_EQUALS", "Refunded")])
         expect:
         storeErrors(piece("USED")) == []
         ec.entity.find("rules.RuleSetConditionPieceUse").condition("pieceId", id("USED")).list()*.ruleSetId == [ruleSetId]
@@ -177,11 +177,11 @@ class PieceTests extends Specification {
     def "a not line over a one-line piece with a compare-two-fields line fires exactly when the line does not hold"() {
         given:
         storePiece("SAME_STATUS", factTypeId, [[conditionSeqId: "01", conditionTypeId: "RCT_COMPARE_FIELD", factTypeId: factTypeId,
-                fieldName: "netsuite_status", operatorEnumId: "ENTCO_EQUALS", compareFieldName: "hotwax_status"]])
+                fieldName: "left_status", operatorEnumId: "ENTCO_EQUALS", compareFieldName: "right_status"]])
         List<Map> notPiece = [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"], piece("SAME_STATUS") + [conditionSeqId: "02", parentConditionSeqId: "01"]]
 
         expect:
-        outcomeFor(notPiece, [netsuite_status: "Refunded", hotwax_status: "Completed"]) == ["FAILS"]
-        outcomeFor(notPiece, [netsuite_status: "Refunded", hotwax_status: "Refunded"]) == []
+        outcomeFor(notPiece, [left_status: "Refunded", right_status: "Completed"]) == ["FAILS"]
+        outcomeFor(notPiece, [left_status: "Refunded", right_status: "Refunded"]) == []
     }
 }
