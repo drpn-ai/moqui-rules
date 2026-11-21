@@ -135,6 +135,7 @@
         <field name="compareValue" type="text-medium" enable-audit-log="true"/>
         <field name="compareFieldName" type="id" enable-audit-log="true"><description>The other field of the same fact a compare-two-fields line reads.</description></field>
         <field name="tolerance" type="number-decimal" enable-audit-log="true"><description>How far apart two numbers may be and still count as equal.</description></field>
+        <field name="normalizeText" type="text-indicator" enable-audit-log="true"><description>Y compares text with surrounding spaces and letter case ignored; a value of only spaces is no value.</description></field>
         <relationship type="one" related="rules.RuleSetRule"/>
         <relationship type="one" title="Parent" related="rules.RuleSetCondition" short-alias="parent">
             <key-map field-name="ruleId"/><key-map field-name="parentConditionSeqId" related="conditionSeqId"/></relationship>
@@ -177,6 +178,7 @@
         <field name="compareValue" type="text-medium" enable-audit-log="true"/>
         <field name="compareFieldName" type="id" enable-audit-log="true"><description>The other field of the same fact a compare-two-fields line reads.</description></field>
         <field name="tolerance" type="number-decimal" enable-audit-log="true"><description>How far apart two numbers may be and still count as equal.</description></field>
+        <field name="normalizeText" type="text-indicator" enable-audit-log="true"><description>Y compares text with surrounding spaces and letter case ignored; a value of only spaces is no value.</description></field>
         <relationship type="one" related="rules.RulePiece"/>
         <relationship type="one" title="Parent" related="rules.RulePieceCondition" short-alias="parent">
             <key-map field-name="pieceId"/><key-map field-name="parentConditionSeqId" related="conditionSeqId"/></relationship>

@@ -37,13 +37,16 @@ class LineTrace {
         String operator = operatorWords?.get(row.operatorEnumId) ?: row.operatorEnumId
         switch ((String) row.conditionTypeId) {
             case "RCT_COMPARE":
+                String text
                 if (row.operatorEnumId in ["ENTCO_IN", "ENTCO_NOT_IN"]) {
                     Object listed = null
                     try { listed = new groovy.json.JsonSlurper().parseText(row.compareValue?.toString() ?: "") } catch (Exception ignored) { }
                     String words = row.operatorEnumId == "ENTCO_IN" ? "is one of" : "is not one of"
-                    return "${row.fieldName} ${words} ${listed instanceof List ? listed.join(', ') : row.compareValue}".toString()
+                    text = "${row.fieldName} ${words} ${listed instanceof List ? listed.join(', ') : row.compareValue}".toString()
+                } else {
+                    text = [row.fieldName, operator, row.compareValue].findAll { it != null && it.toString() != "" }.join(" ")
                 }
-                return [row.fieldName, operator, row.compareValue].findAll { it != null && it.toString() != "" }.join(" ")
+                return row.normalizeText == "Y" ? text + " (ignoring case and surrounding spaces)" : text
             case "RCT_COMPARE_FIELD":
                 String text = "${row.fieldName} ${operator} ${row.compareFieldName}".toString()
                 if (row.tolerance != null && row.tolerance.toString().trim() != "") text += " (within ${row.tolerance})".toString()

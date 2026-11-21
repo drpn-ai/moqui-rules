@@ -17,7 +17,8 @@
   `FACT_TYPE`, ...) into the new ones, then drop the old tables once nothing else uses them: their foreign key and
   index names are the ones the new tables use, which clash on databases where those names are schema-wide. The two
   unique indexes on `RuleSetRule` are now `RULES_RULE_NAME` and `RULES_RULE_PRIORITY`.
-- **New columns.** `RuleSetCondition.compareFieldName` and `RuleSetCondition.tolerance`.
+- **New columns.** `RuleSetCondition.compareFieldName` and `RuleSetCondition.tolerance`; `RuleSetCondition.normalizeText`
+  and `RulePieceCondition.normalizeText`.
 - **New entities.** `RulePiece`, `RulePieceCondition`, and the view `RuleSetConditionPieceUse`.
 - **Reload the seed** (`data/RuleSeedData.xml`): it adds the condition types `RCT_COMPARE_FIELD` and `RCT_PIECE` and
   the four `FieldPairOperator` enumerations (`FPO_REQUIRES`, `FPO_REQUIRED_BY`, `FPO_ALL_IN`, `FPO_CONTAINS_ALL`).
@@ -25,6 +26,9 @@
 ### Behaviour changes
 
 - Compare lines take `ENTCO_IN` and `ENTCO_NOT_IN` with a JSON array `compareValue`; a missing field is not one of any list.
+- A compare line with `normalizeText` Y, on a text field with equals, not equals, in, not in, like or not like, trims
+  and upper-cases the fact value and the compare values before comparing, and a value of only spaces is no value.
+- An any line takes choices that compare two fields or ignore case; exists lines are still refused there.
 - `evaluate#RuleSet` judges a batch: each fact may carry a `recordId`. Each entry of `matchedRules` carries
   `recordIds`, the record of each fact the rule matched. The new out-parameter `decisions` gives one answer per fact
   of the decision's single direct fact type, in input order.

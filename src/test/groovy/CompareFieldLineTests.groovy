@@ -132,10 +132,14 @@ class CompareFieldLineTests extends Specification {
         storeErrors(field("left_amount", "ENTCO_EQUALS", "right_amount", "abc")) == ["Condition 01 of rule pair rule: tolerance abc is not a number"]
     }
 
-    def "a compare two fields line with a value check cannot be one choice of an any line"() {
+    def "a compare two fields line can be one choice of an any line"() {
+        given:
+        List<Map> lines = [[conditionSeqId: "01", conditionTypeId: "RCT_ANY"],
+                field("left_paid", "FPO_REQUIRES", "right_hasPayment") + [conditionSeqId: "02", parentConditionSeqId: "01"],
+                field("left_amount", "ENTCO_GREATER", "right_amount") + [conditionSeqId: "03", parentConditionSeqId: "01"]]
         expect:
-        storeErrors([[conditionSeqId: "01", conditionTypeId: "RCT_ANY"], field("left_paid", "FPO_REQUIRES", "right_hasPayment") +
-                [conditionSeqId: "02", parentConditionSeqId: "01"]]) ==
-                ["Condition 01 of rule pair rule: a compare-two-fields line cannot be one choice of an any line, write a second rule instead"]
+        outcomeFor(lines, [left_paid: "Y", right_hasPayment: "N", left_amount: 1, right_amount: 2]) == []
+        outcomeFor(lines, [left_paid: "Y", right_hasPayment: "Y", left_amount: 1, right_amount: 2]) == ["FAILS"]
+        outcomeFor(lines, [left_paid: "Y", right_hasPayment: "N", left_amount: 3, right_amount: 2]) == ["FAILS"]
     }
 }

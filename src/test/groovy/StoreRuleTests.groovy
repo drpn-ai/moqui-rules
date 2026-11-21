@@ -99,7 +99,7 @@ class StoreRuleTests extends Specification {
         "a field the decision lacks"   | "createdCount" | "ENTCO_EQUALS" | "0"          | "SWITCH_ON"  | "does not read field createdCount"
         "an outcome not in the list"   | "refusedCount" | "ENTCO_EQUALS" | "0"          | "SWITCH_OFF" | "outcome SWITCH_OFF is not in the list"
         "a value that is not a number" | "refusedCount" | "ENTCO_EQUALS" | "abc"        | "SWITCH_ON"  | "value abc does not fit field refusedCount"
-        "an operator not allowed"      | "refusedCount" | "ENTCO_IN"     | "0"          | "SWITCH_ON"  | "operator ENTCO_IN is not allowed"
+        "an operator not allowed"      | "refusedCount" | "ENTCO_BETWEEN" | "0"         | "SWITCH_ON"  | "operator ENTCO_BETWEEN is not allowed"
     }
 
     def "step 4: #change is refused, and the rule keeps its lines"() {

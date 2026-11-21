@@ -11,7 +11,8 @@
                 when readFactTypeIds is given.</description></parameter>
             <parameter name="ruleName" required="true"/>
             <parameter name="conditions" type="List"><description>Maps of conditionSeqId, parentConditionSeqId, sequenceNum,
-                conditionTypeId, factTypeId, fieldName, operatorEnumId, compareValue, compareFieldName and tolerance.</description></parameter>
+                conditionTypeId, factTypeId, fieldName, operatorEnumId, compareValue, compareFieldName, tolerance and
+                normalizeText.</description></parameter>
             <parameter name="readFactTypeIds" type="List"><description>Check against these fact types instead of a decision's.</description></parameter>
             <parameter name="directFactTypeIds" type="List"><description>With readFactTypeIds: the ones a top line may read.</description></parameter>
             <parameter name="pieceChain" type="List"><description>The pieces being expanded, outermost first, to refuse a piece
@@ -64,6 +65,10 @@
                                 in-map="[line: row, childLines: childLines, readFactTypeIds: readFactTypeIds, pieceChain: pieceChain ?: []]"/>
                     </else>
                 </if>
+                <if condition="row.normalizeText == 'Y' &amp;&amp; row.conditionTypeId != 'RCT_COMPARE'">
+                    <script>prepared = prepared + [matches: null, notMatches: null, problems: prepared.problems +
+                            ["only a compare line can ignore case and surrounding spaces, not this ${row.conditionTypeId} line${row.fieldName ? ' on field ' + row.fieldName : ''}".toString()]]</script>
+                </if>
                 <script>preparedBySeqId.put(row.conditionSeqId, prepared + [conditionSeqId: row.conditionSeqId, row: row, children: childLines])
                     problems.addAll(prepared.problems.collect { "Condition ${row.conditionSeqId} of rule ${ruleName}: ${it}".toString() })</script>
             </iterate>
@@ -86,7 +91,7 @@
             <set field="savedRows" from="walkOrder.collect { [conditionSeqId: it.conditionSeqId, parentConditionSeqId: it.parentConditionSeqId,
                     sequenceNum: rows.indexOf(it) + 1, conditionTypeId: it.conditionTypeId, factTypeId: it.factTypeId,
                     fieldName: it.fieldName, operatorEnumId: it.operatorEnumId, compareValue: it.compareValue as String,
-                    compareFieldName: it.compareFieldName, tolerance: it.tolerance] }"/>
+                    compareFieldName: it.compareFieldName, tolerance: it.tolerance, normalizeText: it.normalizeText == 'Y' ? 'Y' : null] }"/>
             <set field="factMatches" from="[:]"/>
             <if condition="!problems">
                 <set field="factMatches" from="topLines.groupBy { it.factTypeIds[0] }.collectEntries { factTypeId, factLines ->
@@ -170,7 +175,7 @@
             RuleConditionType names the service for its kind in prepareServiceName. A line with problems gives no conditions.</description>
         <in-parameters>
             <parameter name="line" type="Map" required="true"><description>conditionSeqId, conditionTypeId, factTypeId,
-                fieldName, operatorEnumId and compareValue.</description></parameter>
+                fieldName, operatorEnumId, compareValue, compareFieldName, tolerance and normalizeText.</description></parameter>
             <parameter name="childLines" type="List"><description>What this service gave for each line directly under it.</description></parameter>
             <parameter name="readFactTypeIds" type="List" required="true"><description>The fact types the decision reads,
                 list item types included.</description></parameter>
@@ -181,8 +186,9 @@
         <out-parameters>
             <parameter name="problems" type="List"/>
             <parameter name="factTypeIds" type="List"><description>The fact types the line reads.</description></parameter>
-            <parameter name="matches" type="Map"><description>condition, an EntityCondition on the fact's own fields, and
-                itemChecks, a list of maps of fieldName, itemMatch and found for exists lines.</description></parameter>
+            <parameter name="matches" type="Map"><description>condition, an EntityCondition on the fact's own fields;
+                itemChecks, a list of maps of fieldName, itemMatch and found for exists lines; and valueChecks, the checks
+                org.moqui.rules.ValueChecks makes where a condition cannot say them.</description></parameter>
             <parameter name="notMatches" type="Map"><description>The line turned around, in the same shape. Empty when the
                 line cannot be turned around.</description></parameter>
         </out-parameters>
@@ -190,6 +196,10 @@
 
     <service verb="prepare" noun="CompareLine" authenticate="anonymous-all" allow-remote="false">
         <implements service="moqui.rules.RuleLineServices.prepare#RuleLine"/>
+        <description>Compare one field of a fact with a fixed value, or with a JSON list of them for ENTCO_IN and
+            ENTCO_NOT_IN. With normalizeText Y, on a text field with equals, not equals, in, not in, like or not like, the
+            fact value and the compare values are trimmed and upper-cased before they are compared, and a value of only
+            spaces is no value; a Moqui condition cannot trim, so such a line is a value check.</description>
         <actions>
             <set field="problems" from="[]"/>
             <set field="factTypeIds" from="[line.factTypeId]"/>
@@ -201,6 +211,9 @@
             <set field="listOperators" from="['ENTCO_IN', 'ENTCO_NOT_IN']"/>
             <set field="operatorsWithoutValue" from="['ENTCO_IS_NULL', 'ENTCO_IS_NOT_NULL']"/>
             <set field="textOnlyOperators" from="['ENTCO_LIKE', 'ENTCO_NOT_LIKE']"/>
+            <set field="normalizedKinds" from="[ENTCO_EQUALS: '=', ENTCO_NOT_EQUALS: '!=', ENTCO_IN: 'in', ENTCO_NOT_IN: 'not in',
+                    ENTCO_LIKE: 'like', ENTCO_NOT_LIKE: 'not like']"/>
+            <set field="normalizeText" from="line.normalizeText == 'Y'"/>
 
             <if condition="childLines">
                 <script>problems.add("a compare line takes no lines under it")</script></if>
@@ -224,11 +237,19 @@
                 <script>problems.add("operator ${line.operatorEnumId} works on text fields only".toString())</script>
                 <return/>
             </if>
+            <if condition="normalizeText &amp;&amp; fieldValueType != 'FVT_TEXT'">
+                <script>problems.add("field ${line.fieldName} is not text, so it cannot ignore case and surrounding spaces".toString())</script>
+                <return/>
+            </if>
+            <if condition="normalizeText &amp;&amp; !normalizedKinds.containsKey(line.operatorEnumId)">
+                <script>problems.add("operator ${line.operatorEnumId} on field ${line.fieldName} cannot ignore case and surrounding spaces".toString())</script>
+                <return/>
+            </if>
             <set field="isListOperator" from="line.operatorEnumId in listOperators"/>
-            <set field="holdsValue" from="!(line.operatorEnumId in operatorsWithoutValue) &amp;&amp; !isListOperator"/>
+            <set field="holdsValue" from="!(line.operatorEnumId in operatorsWithoutValue)"/>
+            <set field="compareValues" from="[]"/>
             <if condition="isListOperator">
                 <!-- the value is a JSON array of one or more strings or numbers, each converted to the field's type -->
-                <set field="listValues" from="[]"/>
                 <script><![CDATA[
                     Object parsedList = null
                     try { parsedList = new groovy.json.JsonSlurper().parseText(line.compareValue?.toString() ?: "") } catch (Exception ignored) { }
@@ -246,35 +267,43 @@
                                     .parameters([valueTypeEnumId: fieldValueType, value: element.toString()]).call()
                             if (convertedElement.problem) {
                                 problems.add("value ${element} in the list does not fit field ${line.fieldName}".toString())
-                            } else listValues.add(convertedElement.convertedValue)
+                            } else compareValues.add(convertedElement.convertedValue)
                         }
                     }
                 ]]></script>
-                <if condition="problems"><return/></if>
+                <else-if condition="holdsValue">
+                    <service-call name="moqui.rules.FactValueServices.convert#FactValue" out-map="convertedCompare" out-map-add-to-existing="false"
+                            in-map="[valueTypeEnumId: fieldValueType, value: line.compareValue]"/>
+                    <if condition="line.compareValue == null || convertedCompare.problem">
+                        <script>problems.add("value ${line.compareValue} does not fit field ${line.fieldName}".toString())</script>
+                        <else><script>compareValues.add(convertedCompare.convertedValue)</script></else>
+                    </if>
+                </else-if>
+            </if>
+            <if condition="problems"><return/></if>
+
+            <set field="conditionFactory" from="ec.entity.conditionFactory"/>
+            <if condition="normalizeText">
+                <set field="check" from="[kind: normalizedKinds.get(line.operatorEnumId), fieldName: line.fieldName, values: compareValues,
+                        normalizeText: true]"/>
+                <set field="matches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: true]]]"/>
+                <set field="notMatches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: false]]]"/>
+                <return/>
+            </if>
+            <if condition="isListOperator">
                 <!-- plain conditions, so the line can sit under any and not; a missing field is not equal to any value, so is in no list -->
-                <set field="conditionFactory" from="ec.entity.conditionFactory"/>
                 <!-- one equals per value, not an IN list: equals compares numbers by value, a list compares the exact BigDecimal scale -->
-                <set field="inCondition" from="conditionFactory.makeCondition(listValues.collect { conditionFactory.makeCondition(line.fieldName,
+                <set field="inCondition" from="conditionFactory.makeCondition(compareValues.collect { conditionFactory.makeCondition(line.fieldName,
                         org.moqui.entity.EntityCondition.ComparisonOperator.EQUALS, it) }, org.moqui.entity.EntityCondition.OR)"/>
-                <set field="notInCondition" from="conditionFactory.makeCondition(listValues.collect { conditionFactory.makeCondition(line.fieldName,
+                <set field="notInCondition" from="conditionFactory.makeCondition(compareValues.collect { conditionFactory.makeCondition(line.fieldName,
                         org.moqui.entity.EntityCondition.ComparisonOperator.NOT_EQUAL, it) }, org.moqui.entity.EntityCondition.AND)"/>
                 <set field="isIn" from="line.operatorEnumId == 'ENTCO_IN'"/>
                 <set field="matches" from="[condition: isIn ? inCondition : notInCondition, itemChecks: [], valueChecks: []]"/>
                 <set field="notMatches" from="[condition: isIn ? notInCondition : inCondition, itemChecks: [], valueChecks: []]"/>
                 <return/>
             </if>
-            <if condition="holdsValue">
-                <service-call name="moqui.rules.FactValueServices.convert#FactValue" out-map="convertedCompare" out-map-add-to-existing="false"
-                        in-map="[valueTypeEnumId: fieldValueType, value: line.compareValue]"/>
-                <if condition="line.compareValue == null || convertedCompare.problem">
-                    <script>problems.add("value ${line.compareValue} does not fit field ${line.fieldName}".toString())</script>
-                    <return/>
-                </if>
-            </if>
-            <if condition="problems"><return/></if>
 
-            <set field="compareConstant" from="holdsValue ? convertedCompare.convertedValue : null"/>
-            <set field="conditionFactory" from="ec.entity.conditionFactory"/>
+            <set field="compareConstant" from="compareValues ? compareValues[0] : null"/>
             <set field="matches" from="[condition: conditionFactory.makeCondition(line.fieldName,
                     conditionFactory.comparisonOperatorFromEnumId(line.operatorEnumId), compareConstant), itemChecks: [], valueChecks: []]"/>
             <set field="notMatches" from="[condition: conditionFactory.makeCondition(line.fieldName,
@@ -376,14 +405,17 @@
                 <script>problems.add("an exists line cannot be one choice of an any line, write a second rule instead")</script>
                 <return/>
             </if>
-            <if condition="childLines.any { it.matches.valueChecks }">
-                <script>problems.add("a compare-two-fields line cannot be one choice of an any line, write a second rule instead")</script>
-                <return/>
-            </if>
 
             <set field="conditionFactory" from="ec.entity.conditionFactory"/>
-            <set field="matches" from="[condition: conditionFactory.makeCondition(childLines*.matches*.condition, org.moqui.entity.EntityCondition.OR),
-                    itemChecks: [], valueChecks: []]"/>
+            <!-- value checks are ANDed onto a condition, so choices that carry them become one value check: some choice's full match holds -->
+            <if condition="childLines.any { it.matches.valueChecks }">
+                <set field="matches" from="[condition: conditionFactory.trueCondition, itemChecks: [],
+                        valueChecks: [[kind: 'any', choices: childLines*.matches, holds: true]]]"/>
+                <else>
+                    <set field="matches" from="[condition: conditionFactory.makeCondition(childLines*.matches*.condition, org.moqui.entity.EntityCondition.OR),
+                            itemChecks: [], valueChecks: []]"/>
+                </else>
+            </if>
             <if condition="childLines.every { it.notMatches != null }">
                 <set field="notMatches" from="[condition: conditionFactory.makeCondition(childLines*.notMatches*.condition,
                         org.moqui.entity.EntityCondition.AND), itemChecks: childLines.collectMany { it.notMatches.itemChecks },

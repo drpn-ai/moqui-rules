@@ -14,7 +14,7 @@
             <parameter name="description"/>
             <parameter name="conditions" type="List">
                 <description>Maps of conditionSeqId, parentConditionSeqId, conditionTypeId, factTypeId, fieldName,
-                    operatorEnumId, compareValue, compareFieldName and tolerance. Lines with no parent must all match.</description>
+                    operatorEnumId, compareValue, compareFieldName, tolerance and normalizeText. Lines with no parent must all match.</description>
             </parameter>
             <parameter name="actions" type="List" required="true">
                 <description>Maps of actionTypeId, outcomeId, factTypeId and fields, a list of maps of fieldName and fixedValue.</description>
@@ -613,7 +613,7 @@
     <service verb="update" noun="FactField" authenticate="true">
         <description>Correct the kind of value of a fact field, like a learned orderId that is an id and so text. Both kinds
             must hold one value. The change is refused, and nothing is saved, when a rule line on the field has a value
-            that does not fit the new kind, or compares with like and the new kind is not text; named-piece lines are checked
+            that does not fit the new kind, or compares with like or ignoring case and the new kind is not text; named-piece lines are checked
             the same way. Decisions that read the
             field are built again on their next call.</description>
         <in-parameters>

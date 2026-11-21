@@ -4,7 +4,7 @@ import org.junit.platform.suite.api.Suite
 import org.moqui.Moqui
 
 @Suite
-@SelectClasses([ DroolsRuleTests.class, ComponentBootTests.class, StoreRuleTests.class, BuildFactTests.class, EvaluateRuleSetTests.class, ListFactTests.class, LearnFileFieldsTests.class, UpdateFactFieldTests.class, CheckFileTests.class, LineKindTests.class, FactTreeRefusalTests.class, HoldTaskTriageTests.class, FactValueTests.class, TenantFilterTests.class, BatchEvaluateTests.class, CompareFieldLineTests.class, PieceTests.class, ExplainTests.class, CacheClearTests.class, HostFilterTests.class, HostNeutralityTests.class, ListOperatorTests.class ])
+@SelectClasses([ DroolsRuleTests.class, ComponentBootTests.class, StoreRuleTests.class, BuildFactTests.class, EvaluateRuleSetTests.class, ListFactTests.class, LearnFileFieldsTests.class, UpdateFactFieldTests.class, CheckFileTests.class, LineKindTests.class, FactTreeRefusalTests.class, HoldTaskTriageTests.class, FactValueTests.class, TenantFilterTests.class, BatchEvaluateTests.class, CompareFieldLineTests.class, PieceTests.class, ExplainTests.class, CacheClearTests.class, HostFilterTests.class, HostNeutralityTests.class, ListOperatorTests.class, NormalizedTextTests.class ])
 class MoquiSuite {
     @AfterAll
     static void destroyMoqui() { Moqui.destroyActiveExecutionContextFactory() }
