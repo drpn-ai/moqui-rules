@@ -162,6 +162,10 @@ class NormalizedTextTests extends Specification {
         "like: leading % then a last letter" | single("code", "ENTCO_LIKE", "%b")                            | [code: "AB"]                 | true
         "like: the last letter must be last" | single("code", "ENTCO_LIKE", "%b")                            | [code: "BA"]                 | false
         "like: _ over an empty value"        | single("code", "ENTCO_LIKE", "_")                             | [code: ""]                   | false
+        "plain like ignores letter case"     | single("code", "ENTCO_LIKE", "ab%", null)                     | [code: "ABCD"]               | true
+        "plain like does not trim"           | single("code", "ENTCO_LIKE", "ab%", null)                     | [code: " ABCD"]              | false
+        "plain like: ß matches SS"           | single("code", "ENTCO_LIKE", "%ss%", null)                    | [code: "Straße"]             | true
+        "plain not like, a missing field"    | single("code", "ENTCO_NOT_LIKE", "ab%", null)                 | [:]                          | true
         "not over all, the normalized line fails" | notOverAll(codeAbc("03"), qtyNine("04"))                 | [code: "x", qty: 9]          | true
         "not over all, both lines hold"      | notOverAll(codeAbc("03"), qtyNine("04"))                      | [code: " ABC", qty: 9]       | false
         "not over all, the plain line fails" | notOverAll(codeAbc("03"), qtyNine("04"))                      | [code: "abc", qty: 1]        | true
@@ -228,6 +232,25 @@ class NormalizedTextTests extends Specification {
                 .parameters([ruleSetId: ruleSetId, facts: [[factTypeId: factTypeId, fact: [code: longText]]]]).call()
         long elapsedMillis = (System.nanoTime() - started).intdiv(1000000L)
         println "like over 20000 characters took ${elapsedMillis} ms"
+
+        then:
+        !ec.message.hasError()
+        result.outcomes == []
+        elapsedMillis < 1000
+    }
+
+    def "a plain like pattern with many wildcards stays fast on long text"() {
+        given:
+        assert storeErrors(single("code", "ENTCO_LIKE", "%a%a%a%a%a%a%a%a%b", null)) == []
+        ((RuleSets) ec.getTool("Rules", RuleSets.class)).builtRuleSet(ruleSetId)
+        String longText = "a" * 20000
+
+        when:
+        long started = System.nanoTime()
+        Map result = ec.service.sync().name("moqui.rules.RuleServices.evaluate#RuleSet")
+                .parameters([ruleSetId: ruleSetId, facts: [[factTypeId: factTypeId, fact: [code: longText]]]]).call()
+        long elapsedMillis = (System.nanoTime() - started).intdiv(1000000L)
+        println "plain like over 20000 characters took ${elapsedMillis} ms"
 
         then:
         !ec.message.hasError()

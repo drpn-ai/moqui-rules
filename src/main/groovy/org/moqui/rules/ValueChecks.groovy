@@ -23,11 +23,11 @@ class ValueChecks {
 
     /** One fact value against fixed values. A missing value equals none of them and is like none of them. */
     static boolean fixedValue(String kind, Object value, List listed, boolean normalizeText) {
-        Object fact = normalizeText ? normalizedText(value) : value
-        List compareTo = normalizeText ? listed.collect { normalizedText(it) } : listed
         boolean like = kind == "like" || kind == "not like"
-        boolean found = fact != null && compareTo.any { Object one ->
-            one != null && (like ? likeMatches(fact.toString(), one.toString()) : (normalizeText ? fact == one : equalValues(fact, one))) }
+        Object fact = folded(value, normalizeText, like)
+        boolean found = fact != null && listed.any { Object listedValue ->
+            Object one = folded(listedValue, normalizeText, like)
+            one != null && (like ? likeMatches((String) fact, (String) one) : (normalizeText ? fact == one : equalValues(fact, one))) }
         switch (kind) {
             case "=": case "in": case "like": return found
             case "!=": case "not in": case "not like": return !found
@@ -35,10 +35,17 @@ class ValueChecks {
         }
     }
 
-    /** Trimmed and upper-cased; null, or only spaces, is no value. */
+    /** Trimmed and upper-cased; null, or only characters up to U+0020, is no value. */
     static String normalizedText(Object value) {
         String text = normalize(value)
         return text?.toUpperCase(Locale.ROOT)
+    }
+
+    /** normalizeText trims and upper-cases; without it, like still upper-cases and the other kinds compare as is. */
+    private static Object folded(Object value, boolean normalizeText, boolean like) {
+        if (normalizeText) return normalizedText(value)
+        if (like) return value?.toString()?.toUpperCase(Locale.ROOT)
+        return value
     }
 
     /**

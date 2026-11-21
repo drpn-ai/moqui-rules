@@ -211,7 +211,7 @@
             <set field="listOperators" from="['ENTCO_IN', 'ENTCO_NOT_IN']"/>
             <set field="operatorsWithoutValue" from="['ENTCO_IS_NULL', 'ENTCO_IS_NOT_NULL']"/>
             <set field="textOnlyOperators" from="['ENTCO_LIKE', 'ENTCO_NOT_LIKE']"/>
-            <set field="normalizedKinds" from="[ENTCO_EQUALS: '=', ENTCO_NOT_EQUALS: '!=', ENTCO_IN: 'in', ENTCO_NOT_IN: 'not in',
+            <set field="valueCheckKinds" from="[ENTCO_EQUALS: '=', ENTCO_NOT_EQUALS: '!=', ENTCO_IN: 'in', ENTCO_NOT_IN: 'not in',
                     ENTCO_LIKE: 'like', ENTCO_NOT_LIKE: 'not like']"/>
             <set field="normalizeText" from="line.normalizeText == 'Y'"/>
 
@@ -241,7 +241,7 @@
                 <script>problems.add("field ${line.fieldName} is not text, so it cannot ignore case and surrounding spaces".toString())</script>
                 <return/>
             </if>
-            <if condition="normalizeText &amp;&amp; !normalizedKinds.containsKey(line.operatorEnumId)">
+            <if condition="normalizeText &amp;&amp; !valueCheckKinds.containsKey(line.operatorEnumId)">
                 <script>problems.add("operator ${line.operatorEnumId} on field ${line.fieldName} cannot ignore case and surrounding spaces".toString())</script>
                 <return/>
             </if>
@@ -283,9 +283,10 @@
             <if condition="problems"><return/></if>
 
             <set field="conditionFactory" from="ec.entity.conditionFactory"/>
-            <if condition="normalizeText">
-                <set field="check" from="[kind: normalizedKinds.get(line.operatorEnumId), fieldName: line.fieldName, values: compareValues,
-                        normalizeText: true]"/>
+            <!-- a Moqui condition cannot trim, and its like is a regex: normalized lines and every like are value checks -->
+            <if condition="normalizeText || line.operatorEnumId in textOnlyOperators">
+                <set field="check" from="[kind: valueCheckKinds.get(line.operatorEnumId), fieldName: line.fieldName, values: compareValues,
+                        normalizeText: normalizeText]"/>
                 <set field="matches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: true]]]"/>
                 <set field="notMatches" from="[condition: conditionFactory.trueCondition, itemChecks: [], valueChecks: [check + [holds: false]]]"/>
                 <return/>
