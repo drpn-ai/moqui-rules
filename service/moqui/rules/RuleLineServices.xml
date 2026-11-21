@@ -196,7 +196,9 @@
             <set field="oppositeOperators" from="[ENTCO_EQUALS: 'ENTCO_NOT_EQUALS', ENTCO_NOT_EQUALS: 'ENTCO_EQUALS',
                     ENTCO_LESS: 'ENTCO_GREATER_EQ', ENTCO_GREATER_EQ: 'ENTCO_LESS', ENTCO_GREATER: 'ENTCO_LESS_EQ',
                     ENTCO_LESS_EQ: 'ENTCO_GREATER', ENTCO_LIKE: 'ENTCO_NOT_LIKE', ENTCO_NOT_LIKE: 'ENTCO_LIKE',
-                    ENTCO_IS_NULL: 'ENTCO_IS_NOT_NULL', ENTCO_IS_NOT_NULL: 'ENTCO_IS_NULL']"/>
+                    ENTCO_IS_NULL: 'ENTCO_IS_NOT_NULL', ENTCO_IS_NOT_NULL: 'ENTCO_IS_NULL',
+                    ENTCO_IN: 'ENTCO_NOT_IN', ENTCO_NOT_IN: 'ENTCO_IN']"/>
+            <set field="listOperators" from="['ENTCO_IN', 'ENTCO_NOT_IN']"/>
             <set field="operatorsWithoutValue" from="['ENTCO_IS_NULL', 'ENTCO_IS_NOT_NULL']"/>
             <set field="textOnlyOperators" from="['ENTCO_LIKE', 'ENTCO_NOT_LIKE']"/>
 
@@ -222,7 +224,48 @@
                 <script>problems.add("operator ${line.operatorEnumId} works on text fields only".toString())</script>
                 <return/>
             </if>
-            <set field="holdsValue" from="!(line.operatorEnumId in operatorsWithoutValue)"/>
+            <set field="isListOperator" from="line.operatorEnumId in listOperators"/>
+            <set field="holdsValue" from="!(line.operatorEnumId in operatorsWithoutValue) &amp;&amp; !isListOperator"/>
+            <if condition="isListOperator">
+                <!-- the value is a JSON array of one or more strings or numbers, each converted to the field's type -->
+                <set field="listValues" from="[]"/>
+                <script><![CDATA[
+                    Object parsedList = null
+                    try { parsedList = new groovy.json.JsonSlurper().parseText(line.compareValue?.toString() ?: "") } catch (Exception ignored) { }
+                    if (!(parsedList instanceof List)) {
+                        problems.add("value ${line.compareValue} for field ${line.fieldName} is not a JSON list".toString())
+                    } else if (parsedList.isEmpty()) {
+                        problems.add("the list for field ${line.fieldName} is empty".toString())
+                    } else {
+                        for (Object element in parsedList) {
+                            if (!(element instanceof CharSequence || element instanceof Number)) {
+                                problems.add("the list for field ${line.fieldName} holds ${element == null ? 'null' : element} which is not a text or a number".toString())
+                                break
+                            }
+                            Map convertedElement = ec.service.sync().name("moqui.rules.FactValueServices.convert#FactValue")
+                                    .parameters([valueTypeEnumId: fieldValueType, value: element.toString()]).call()
+                            if (convertedElement.problem) {
+                                problems.add("value ${element} in the list does not fit field ${line.fieldName}".toString())
+                            } else listValues.add(convertedElement.convertedValue)
+                        }
+                    }
+                ]]></script>
+                <if condition="problems"><return/></if>
+                <!-- plain conditions, so the line can sit under any and not; a missing field is in no list, so is not in every list -->
+                <set field="conditionFactory" from="ec.entity.conditionFactory"/>
+                <!-- one equals per value, not an IN list: equals compares numbers by value, a list compares the exact BigDecimal scale -->
+                <set field="inCondition" from="conditionFactory.makeCondition(listValues.collect { conditionFactory.makeCondition(line.fieldName,
+                        org.moqui.entity.EntityCondition.ComparisonOperator.EQUALS, it) }, org.moqui.entity.EntityCondition.OR)"/>
+                <set field="notInCondition" from="conditionFactory.makeCondition([
+                        conditionFactory.makeCondition(line.fieldName, org.moqui.entity.EntityCondition.ComparisonOperator.IS_NULL, null),
+                        conditionFactory.makeCondition(listValues.collect { conditionFactory.makeCondition(line.fieldName,
+                                org.moqui.entity.EntityCondition.ComparisonOperator.NOT_EQUAL, it) }, org.moqui.entity.EntityCondition.AND)],
+                        org.moqui.entity.EntityCondition.OR)"/>
+                <set field="isIn" from="line.operatorEnumId == 'ENTCO_IN'"/>
+                <set field="matches" from="[condition: isIn ? inCondition : notInCondition, itemChecks: [], valueChecks: []]"/>
+                <set field="notMatches" from="[condition: isIn ? notInCondition : inCondition, itemChecks: [], valueChecks: []]"/>
+                <return/>
+            </if>
             <if condition="holdsValue">
                 <service-call name="moqui.rules.FactValueServices.convert#FactValue" out-map="convertedCompare" out-map-add-to-existing="false"
                         in-map="[valueTypeEnumId: fieldValueType, value: line.compareValue]"/>

@@ -24,6 +24,7 @@
 
 ### Behaviour changes
 
+- Compare lines take `ENTCO_IN` and `ENTCO_NOT_IN` with a JSON array `compareValue`; a missing field is not one of any list.
 - `evaluate#RuleSet` judges a batch: each fact may carry a `recordId`. Each entry of `matchedRules` carries
   `recordIds`, the record of each fact the rule matched. The new out-parameter `decisions` gives one answer per fact
   of the decision's single direct fact type, in input order.
