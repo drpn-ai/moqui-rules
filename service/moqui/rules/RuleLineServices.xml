@@ -159,12 +159,12 @@
             <set field="matches" from="[condition: conditionFactory.makeCondition(inner*.matches*.condition, org.moqui.entity.EntityCondition.AND),
                     itemChecks: inner.collectMany { it.matches.itemChecks },
                     valueChecks: inner.collectMany { it.matches.valueChecks ?: [] }]"/>
-            <!-- one line turns around as itself; several only when each is a plain condition, as their OR -->
+            <!-- one line turns around as itself; several as one value check, some line turned around holds; an exists line only alone -->
             <if condition="inner.size() == 1">
                 <set field="notMatches" from="inner[0].notMatches"/>
-                <else-if condition="inner.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks &amp;&amp; !it.notMatches.valueChecks }">
-                    <set field="notMatches" from="[condition: conditionFactory.makeCondition(inner*.notMatches*.condition,
-                            org.moqui.entity.EntityCondition.OR), itemChecks: [], valueChecks: []]"/>
+                <else-if condition="inner.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks }">
+                    <set field="notMatches" from="[condition: conditionFactory.trueCondition, itemChecks: [],
+                            valueChecks: [[kind: 'any', choices: inner*.notMatches, holds: true]]]"/>
                 </else-if>
             </if>
         </actions>
@@ -380,12 +380,12 @@
             <set field="matches" from="[condition: conditionFactory.makeCondition(childLines*.matches*.condition, org.moqui.entity.EntityCondition.AND),
                     itemChecks: childLines.collectMany { it.matches.itemChecks },
                     valueChecks: childLines.collectMany { it.matches.valueChecks ?: [] }]"/>
-            <!-- one line turns around as itself; several only when each is a plain condition, as their OR -->
+            <!-- one line turns around as itself; several as one value check, some line turned around holds; an exists line only alone -->
             <if condition="childLines.size() == 1">
                 <set field="notMatches" from="childLines[0].notMatches"/>
-                <else-if condition="childLines.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks &amp;&amp; !it.notMatches.valueChecks }">
-                    <set field="notMatches" from="[condition: conditionFactory.makeCondition(childLines*.notMatches*.condition,
-                            org.moqui.entity.EntityCondition.OR), itemChecks: [], valueChecks: []]"/>
+                <else-if condition="childLines.every { it.notMatches != null &amp;&amp; !it.notMatches.itemChecks }">
+                    <set field="notMatches" from="[condition: conditionFactory.trueCondition, itemChecks: [],
+                            valueChecks: [[kind: 'any', choices: childLines*.notMatches, holds: true]]]"/>
                 </else-if>
             </if>
         </actions>
@@ -444,9 +444,10 @@
             <set field="matches" from="[condition: conditionFactory.makeCondition(childLines*.notMatches*.condition, org.moqui.entity.EntityCondition.AND),
                     itemChecks: childLines.collectMany { it.notMatches.itemChecks },
                     valueChecks: childLines.collectMany { it.notMatches.valueChecks ?: [] }]"/>
-            <if condition="childLines.every { !it.matches.itemChecks &amp;&amp; !it.matches.valueChecks }">
-                <set field="notMatches" from="[condition: conditionFactory.makeCondition(childLines*.matches*.condition,
-                        org.moqui.entity.EntityCondition.OR), itemChecks: [], valueChecks: []]"/>
+            <!-- turned around, some line under it holds: one value check; a not line over an exists line does not turn around -->
+            <if condition="childLines.every { !it.matches.itemChecks }">
+                <set field="notMatches" from="[condition: conditionFactory.trueCondition, itemChecks: [],
+                        valueChecks: [[kind: 'any', choices: childLines*.matches, holds: true]]]"/>
             </if>
         </actions>
     </service>

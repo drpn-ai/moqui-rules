@@ -10,6 +10,7 @@ class NormalizedTextTests extends Specification {
     @Shared String ruleSetId = "RULES_TEST_NORM_DECISION"
     @Shared String factTypeId = "RULES_TEST_NORM_FACT"
     @Shared String pieceId = "RULES_TEST_NORM_P"
+    @Shared String twoLinePieceId = "RULES_TEST_NORM_P2"
 
     def setupSpec() {
         ec = Moqui.getExecutionContext(); RulesTestData.ensureLoaded(ec)
@@ -26,6 +27,9 @@ class NormalizedTextTests extends Specification {
         ec.message.clearAll()
         ec.service.sync().name("moqui.rules.RuleServices.store#Piece").parameters([pieceId: pieceId, factTypeId: factTypeId,
                 conditions: single("code", "ENTCO_EQUALS", "abc")]).call()
+        assert !ec.message.hasError(), ec.message.errorsString
+        ec.service.sync().name("moqui.rules.RuleServices.store#Piece").parameters([pieceId: twoLinePieceId, factTypeId: factTypeId,
+                conditions: [codeAbc("01"), qtyNine("02")]]).call()
         assert !ec.message.hasError(), ec.message.errorsString
     }
 
@@ -81,6 +85,21 @@ class NormalizedTextTests extends Specification {
     static List<Map> notOverAny(Map first, Map second) {
         [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"], [conditionSeqId: "02", parentConditionSeqId: "01", conditionTypeId: "RCT_ANY"],
          first + [parentConditionSeqId: "02"], second + [parentConditionSeqId: "02"]]
+    }
+
+    static List<Map> notOverAll(Map first, Map second) {
+        [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"], [conditionSeqId: "02", parentConditionSeqId: "01", conditionTypeId: "RCT_ALL"],
+         first + [parentConditionSeqId: "02"], second + [parentConditionSeqId: "02"]]
+    }
+
+    static List<Map> notOverNot(Map line) {
+        [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"], [conditionSeqId: "02", parentConditionSeqId: "01", conditionTypeId: "RCT_NOT"],
+         line + [parentConditionSeqId: "02"]]
+    }
+
+    static List<Map> notOverTwoLinePiece() {
+        [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"],
+         [conditionSeqId: "02", parentConditionSeqId: "01", conditionTypeId: "RCT_PIECE", compareValue: "RULES_TEST_NORM_P2"]]
     }
 
     static Map codeAbc(String seq) { compare(seq, "code", "ENTCO_EQUALS", "abc") }
@@ -143,6 +162,14 @@ class NormalizedTextTests extends Specification {
         "like: leading % then a last letter" | single("code", "ENTCO_LIKE", "%b")                            | [code: "AB"]                 | true
         "like: the last letter must be last" | single("code", "ENTCO_LIKE", "%b")                            | [code: "BA"]                 | false
         "like: _ over an empty value"        | single("code", "ENTCO_LIKE", "_")                             | [code: ""]                   | false
+        "not over all, the normalized line fails" | notOverAll(codeAbc("03"), qtyNine("04"))                 | [code: "x", qty: 9]          | true
+        "not over all, both lines hold"      | notOverAll(codeAbc("03"), qtyNine("04"))                      | [code: " ABC", qty: 9]       | false
+        "not over all, the plain line fails" | notOverAll(codeAbc("03"), qtyNine("04"))                      | [code: "abc", qty: 1]        | true
+        "not over all with a plain like"     | notOverAll(compare("03", "code", "ENTCO_LIKE", "ab%", null), qtyNine("04")) | [code: "ABX", qty: 9] | false
+        "not over not, the line holds"       | notOverNot(codeAbc("03"))                                     | [code: " abc"]               | true
+        "not over not, the line fails"       | notOverNot(codeAbc("03"))                                     | [code: "x"]                  | false
+        "not over a two-line piece, both hold" | notOverTwoLinePiece()                                       | [code: "abc ", qty: 9]       | false
+        "not over a two-line piece, one fails" | notOverTwoLinePiece()                                       | [code: "ABC", qty: 1]        | true
     }
 
     def "the flag is refused off a text compare line with an operator it fits, naming the field and the reason"() {
@@ -155,6 +182,20 @@ class NormalizedTextTests extends Specification {
                 ["Condition 01 of rule norm rule: only a compare line can ignore case and surrounding spaces, not this RCT_COMPARE_FIELD line on field a"]
         storeErrors([[conditionSeqId: "01", conditionTypeId: "RCT_ALL", normalizeText: "Y"], codeAbc("02") + [parentConditionSeqId: "01"]]) ==
                 ["Condition 01 of rule norm rule: only a compare line can ignore case and surrounding spaces, not this RCT_ALL line"]
+    }
+
+    def "explain agrees with evaluate on a not line over an all line, a two-line piece and a not line"() {
+        expect:
+        [[notOverAll(codeAbc("03"), qtyNine("04")), [code: "x", qty: 9]],
+         [notOverAll(codeAbc("03"), qtyNine("04")), [code: " ABC", qty: 9]],
+         [notOverTwoLinePiece(), [code: "abc", qty: 9]],
+         [notOverTwoLinePiece(), [code: "abc", qty: 1]],
+         [notOverNot(codeAbc("03")), [code: " abc"]],
+         [notOverNot(codeAbc("03")), [code: "x"]]].every { List pair ->
+            boolean fired = fires((List<Map>) pair[0], (Map) pair[1])
+            Map explained = explain((Map) pair[1])
+            explained.rules[0].matched == fired && explained.rules[0].lines[0].holds == fired
+        }
     }
 
     def "explain says the line ignores case and surrounding spaces, and traces the lines under an any line"() {
