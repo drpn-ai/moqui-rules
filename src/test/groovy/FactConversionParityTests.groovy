@@ -143,8 +143,21 @@ class FactConversionParityTests extends Specification {
     }
 
     static final List<String> TEST_FACT_TYPES = ["ParityFact", "ParityItem", "ParityOdd"]
+    static final String CHECK_SET = "PARITY_CHECK_SET"
 
     void removeTestData() {
+        List<String> fileCheckIds = ec.entity.find("rules.FileCheck").condition("ruleSetId", CHECK_SET).list()*.fileCheckId
+        if (fileCheckIds) {
+            ec.entity.find("rules.FileCheckRecord").condition("fileCheckId", "in", fileCheckIds).deleteAll()
+            ec.entity.find("rules.FileCheck").condition("fileCheckId", "in", fileCheckIds).deleteAll()
+        }
+        List<String> ruleIds = ec.entity.find("rules.RuleSetRule").condition("ruleSetId", CHECK_SET).list()*.ruleId
+        if (ruleIds) {
+            for (String entityName in ["RuleSetAction", "RuleSetCondition", "RuleSetRule"])
+                ec.entity.find("rules." + entityName).condition("ruleId", "in", ruleIds).deleteAll()
+        }
+        for (String entityName in ["RuleSetOutcome", "RuleSetFactType", "RuleSet"])
+            ec.entity.find("rules." + entityName).condition("ruleSetId", CHECK_SET).deleteAll()
         for (String factTypeId in TEST_FACT_TYPES) {
             ec.entity.find("rules.FactField").condition("factTypeId", factTypeId).deleteAll()
             ec.entity.find("rules.FactType").condition("factTypeId", factTypeId).deleteAll()
@@ -289,5 +302,55 @@ class FactConversionParityTests extends Specification {
         results.size() == 200
         results.every { it.fact.count == 5L }
         hits(valueService) == beforeBatch
+    }
+
+    def "convert#Facts gives what convert#Fact gives for each entry"() {
+        given:
+        List<Map> entries = FACT_CASES.collect { [factTypeId: "ParityFact", values: it[1]] }
+
+        when:
+        Map out = ec.service.sync().name("moqui.rules.RuleServices.convert#Facts").parameters([entries: entries]).call()
+
+        then:
+        !ec.message.hasError()
+        out.results.size() == FACT_CASES.size()
+        FACT_CASES.eachWithIndex { c, i ->
+            assert out.results[i].fact == c[2], c[0]
+            assert out.results[i].fact.collectEntries { k, v -> [k, v?.getClass()] } == c[2].collectEntries { k, v -> [k, v?.getClass()] }, c[0]
+            assert out.results[i].problems == c[3], c[0]
+            assert out.results[i] == convertFact("ParityFact", c[1]), c[0]
+        }
+    }
+
+    def "convert#Facts of no entries gives no results and adds no errors"() {
+        when:
+        Map out = ec.service.sync().name("moqui.rules.RuleServices.convert#Facts").parameters([entries: []]).call()
+
+        then:
+        out.results == []
+        !ec.message.hasError()
+    }
+
+    def "check#File gives each record its own outcome or refusal"() {
+        given:
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: CHECK_SET, firstMatchOnly: "Y"]).create()
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: CHECK_SET, factTypeId: "ParityItem"]).create()
+        ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: CHECK_SET, outcomeId: "PARITY_OK"]).create()
+        ec.service.sync().name("moqui.rules.RuleServices.store#Rule").parameters([ruleSetId: CHECK_SET, ruleName: "any", priority: 10,
+                conditions: [], actions: [[actionTypeId: "RAT_OUTCOME", outcomeId: "PARITY_OK"]]]).call()
+        assert !ec.message.hasError()
+
+        when:
+        Map out = ec.service.sync().name("moqui.rules.RuleServices.check#File").parameters([ruleSetId: CHECK_SET, factTypeId: "ParityItem",
+                fileName: "items.csv", fileText: "name,count\na,1\nb,zz\nc,3\n"]).call()
+
+        then:
+        !ec.message.hasError()
+        out.checkedRecords*.recordNumber == [1, 2, 3]
+        out.checkedRecords[0].outcomes == ["PARITY_OK"]
+        out.checkedRecords[0].refusedReasons == null
+        out.checkedRecords[1].refusedReasons == ["Value zz does not fit field count of ParityItem"]
+        out.checkedRecords[1].outcomes == null
+        out.checkedRecords[2].outcomes == ["PARITY_OK"]
     }
 }

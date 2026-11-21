@@ -268,7 +268,7 @@
 
     <service verb="convert" noun="Fact" authenticate="anonymous-all" allow-remote="false">
         <description>Check a fact a caller hands in against the fields of its fact type, and convert each value to its
-            field's kind. A list field holds item facts; this service converts each one with the item fact type. It gives
+            field's kind. A list field holds item facts; each one is converted with the item fact type. It gives
             every problem at once and adds no errors, so the caller decides what a problem means.</description>
         <in-parameters>
             <parameter name="factTypeId" required="true"/>
@@ -279,46 +279,24 @@
             <parameter name="problems" type="List"/>
         </out-parameters>
         <actions>
-            <set field="problems" from="[]"/>
-            <set field="fact" from="[:]"/>
-            <set field="values" from="values ?: [:]"/>
-            <entity-find entity-name="rules.FactField" list="factFields"><econdition field-name="factTypeId"/></entity-find>
-            <set field="recordIdField" from="org.moqui.rules.BuiltRuleSet.RECORD_ID_FIELD"/>
-            <if condition="values.containsKey(recordIdField)">
-                <script>problems.add("A fact of ${factTypeId} may not hold a value named ${recordIdField}; give the record id beside the fact".toString())</script></if>
-            <set field="unknownFieldNames" from="values.keySet() - factFields*.fieldName - [recordIdField]"/>
-            <iterate list="unknownFieldNames" entry="unknownFieldName">
-                <script>problems.add("Fact type ${factTypeId} has no field ${unknownFieldName}".toString())</script></iterate>
+            <set field="converted" from="new org.moqui.rules.FactConverter(ec).convertFact(factTypeId, values)"/>
+            <set field="fact" from="converted.fact"/>
+            <set field="problems" from="converted.problems"/>
+        </actions>
+    </service>
 
-            <iterate list="factFields" entry="factField">
-                <set field="value" from="values.get(factField.fieldName)"/>
-                <if condition="factField.valueTypeEnumId == 'FVT_LIST'">
-                    <if condition="value != null &amp;&amp; !(value instanceof List)">
-                        <script>problems.add("Field ${factField.fieldName} of ${factTypeId} must be a list".toString())</script>
-                        <continue/>
-                    </if>
-                    <set field="items" from="value == null ? null : []"/>
-                    <set field="itemList" from="value ?: []"/>
-                    <iterate list="itemList" entry="itemValues">
-                        <if condition="!(itemValues instanceof Map)">
-                            <script>problems.add("Item ${itemValues_index + 1} of field ${factField.fieldName} of ${factTypeId} must be a fact".toString())</script>
-                            <continue/>
-                        </if>
-                        <service-call name="moqui.rules.RuleServices.convert#Fact" out-map="convertedItem" out-map-add-to-existing="false"
-                                in-map="[factTypeId: factField.itemFactTypeId, values: itemValues]"/>
-                        <script>problems.addAll(convertedItem.problems)</script>
-                        <script>items.add(convertedItem.fact)</script>
-                    </iterate>
-                    <script>fact.put(factField.fieldName, items)</script>
-                    <continue/>
-                </if>
-                <service-call name="moqui.rules.FactValueServices.convert#FactValue" out-map="convertedValue" out-map-add-to-existing="false"
-                        in-map="[valueTypeEnumId: factField.valueTypeEnumId, value: value]"/>
-                <if condition="convertedValue.problem">
-                    <script>problems.add("Value ${value} does not fit field ${factField.fieldName} of ${factTypeId}".toString())</script>
-                    <else><script>fact.put(factField.fieldName, convertedValue.convertedValue)</script></else>
-                </if>
-            </iterate>
+    <service verb="convert" noun="Facts" authenticate="anonymous-all" allow-remote="false">
+        <description>Convert many facts at once, each as convert#Fact would, and give the results in the order of the
+            entries. It reports every problem per fact and adds no errors, so the caller decides what a problem means.</description>
+        <in-parameters>
+            <parameter name="entries" type="List"><description>Maps of factTypeId and values, the values being a Map of
+                field values. None gives no results.</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="results" type="List"><description>One map of fact and problems per entry, in input order.</description></parameter>
+        </out-parameters>
+        <actions>
+            <set field="results" from="new org.moqui.rules.FactConverter(ec).convertAll(entries ?: [])"/>
         </actions>
     </service>
 
@@ -351,13 +329,17 @@
 
             <set field="convertedFacts" from="[]"/>
             <set field="factProblems" from="[]"/>
+            <set field="readFacts" from="facts.findAll { it.factTypeId in readFactTypeIds }"/>
+            <service-call name="moqui.rules.RuleServices.convert#Facts" out-map="batchConverted" out-map-add-to-existing="false"
+                    in-map="[entries: readFacts.collect { [factTypeId: it.factTypeId, values: it.fact] }]"/>
+            <set field="readIndex" from="0"/>
             <iterate list="facts" entry="factEntry">
                 <if condition="!(factEntry.factTypeId in readFactTypeIds)">
                     <script>factProblems.add("Decision ${ruleSetId} does not read fact type ${factEntry.factTypeId}".toString())</script>
                     <continue/>
                 </if>
-                <service-call name="moqui.rules.RuleServices.convert#Fact" out-map="converted" out-map-add-to-existing="false"
-                        in-map="[factTypeId: factEntry.factTypeId, values: factEntry.fact]"/>
+                <set field="converted" from="batchConverted.results.get(readIndex)"/>
+                <set field="readIndex" from="readIndex + 1"/>
                 <script>factProblems.addAll(converted.problems)</script>
                 <script>convertedFacts.add([factTypeId: factEntry.factTypeId, fact: converted.fact, recordId: factEntry.recordId?.toString()])</script>
             </iterate>
@@ -689,9 +671,10 @@
             <set field="checkedRecords" from="[]"/>
             <set field="keptRows" from="[]"/>
             <set field="fileRecords" from="read.records"/>
+            <service-call name="moqui.rules.RuleServices.convert#Facts" out-map="batchConverted" out-map-add-to-existing="false"
+                    in-map="[entries: fileRecords.collect { [factTypeId: factTypeId, values: it.values] }]"/>
             <iterate list="fileRecords" entry="fileRecord">
-                <service-call name="moqui.rules.RuleServices.convert#Fact" out-map="converted" out-map-add-to-existing="false"
-                        in-map="[factTypeId: factTypeId, values: fileRecord.values]"/>
+                <set field="converted" from="batchConverted.results.get(fileRecord_index)"/>
                 <set field="refusedReasons" from="fileRecord.problems + converted.problems"/>
                 <set field="checkedRecord" from="[recordNumber: fileRecord_index + 1]"/>
                 <if condition="!refusedReasons">

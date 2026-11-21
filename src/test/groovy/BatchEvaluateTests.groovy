@@ -129,6 +129,36 @@ class BatchEvaluateTests extends Specification {
         out.matchedRules.every { it.recordIds.checkResult in ["A", "B", "C"] }
     }
 
+    def "problems come in input order across a mixed batch, and nothing is evaluated"() {
+        when:
+        Map out = evaluate([[factTypeId: "checkResult", recordId: "A", fact: [refusedCount: 0]],
+                            [factTypeId: "batchTestA", recordId: "B", fact: [code: "a"]],
+                            [factTypeId: "checkResult", recordId: "C", fact: [refusedCount: "x"]],
+                            [factTypeId: "checkResult", recordId: "D", fact: [refusedCount: 1]]])
+        then:
+        out == null || out.outcomes == null
+        ec.message.errors == ["Decision RULES_TEST_BATCH does not read fact type batchTestA",
+                              "Value x does not fit field refusedCount of checkResult"]
+    }
+
+    def "a 500-fact batch decides the same as 500 single-fact calls"() {
+        given:
+        List<Map> facts = (1..500).collect {
+            [factTypeId: "checkResult", recordId: "R" + it,
+             fact: [refusedCount: it % 3 == 0 ? "0" : "5", logStatusId: it % 2 == 0 ? "DmlsFinished" : "DmlsRunning", tryCount: (it % 5).toString()]]
+        }
+        when:
+        Map batch = evaluate(facts)
+        List<Map> singles = facts.collect { evaluate([it]).decisions[0] }
+        then:
+        !ec.message.hasError()
+        batch.decisions.size() == 500
+        batch.decisions*.recordId == facts*.recordId
+        batch.decisions*.outcomes == singles*.outcomes
+        batch.decisions.collect { it.matchedRules*.ruleName } == singles.collect { it.matchedRules*.ruleName }
+        batch.decisions*.outcomes.flatten().toSet().size() > 1
+    }
+
     def "a record id used twice in one batch is refused, naming it"() {
         when: evaluate([[factTypeId: "checkResult", recordId: "A", fact: [refusedCount: 0]], [factTypeId: "checkResult", recordId: "A", fact: [refusedCount: 1]]])
         then: ec.message.errors.any { it.contains("A") && it.contains("more than once") }
