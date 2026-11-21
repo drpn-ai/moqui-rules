@@ -245,6 +245,11 @@
                 <script>problems.add("operator ${line.operatorEnumId} on field ${line.fieldName} cannot ignore case and surrounding spaces".toString())</script>
                 <return/>
             </if>
+            <set field="compareValueLength" from="line.compareValue == null ? 0 : line.compareValue.toString().length()"/>
+            <if condition="compareValueLength &gt; 4000">
+                <script>problems.add("the value for field ${line.fieldName} is ${compareValueLength} characters long, more than the 4000 a compare value holds".toString())</script>
+                <return/>
+            </if>
             <set field="isListOperator" from="line.operatorEnumId in listOperators"/>
             <set field="holdsValue" from="!(line.operatorEnumId in operatorsWithoutValue)"/>
             <set field="compareValues" from="[]"/>

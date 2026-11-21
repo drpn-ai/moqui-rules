@@ -132,7 +132,7 @@
         <field name="factTypeId" type="id" enable-audit-log="true"/>
         <field name="fieldName" type="id" enable-audit-log="true"/>
         <field name="operatorEnumId" type="id" enable-audit-log="true"/>
-        <field name="compareValue" type="text-medium" enable-audit-log="true"/>
+        <field name="compareValue" type="text-long" enable-audit-log="true"><description>The fixed value, a JSON list, or a pieceId; at most 4000 characters.</description></field>
         <field name="compareFieldName" type="id" enable-audit-log="true"><description>The other field of the same fact a compare-two-fields line reads.</description></field>
         <field name="tolerance" type="number-decimal" enable-audit-log="true"><description>How far apart two numbers may be and still count as equal.</description></field>
         <field name="normalizeText" type="text-indicator" enable-audit-log="true"><description>Y compares text with surrounding spaces and letter case ignored; a value of only spaces is no value.</description></field>
@@ -175,7 +175,7 @@
         <field name="factTypeId" type="id" enable-audit-log="true"/>
         <field name="fieldName" type="id" enable-audit-log="true"/>
         <field name="operatorEnumId" type="id" enable-audit-log="true"/>
-        <field name="compareValue" type="text-medium" enable-audit-log="true"/>
+        <field name="compareValue" type="text-long" enable-audit-log="true"><description>The fixed value, a JSON list, or a pieceId; at most 4000 characters.</description></field>
         <field name="compareFieldName" type="id" enable-audit-log="true"><description>The other field of the same fact a compare-two-fields line reads.</description></field>
         <field name="tolerance" type="number-decimal" enable-audit-log="true"><description>How far apart two numbers may be and still count as equal.</description></field>
         <field name="normalizeText" type="text-indicator" enable-audit-log="true"><description>Y compares text with surrounding spaces and letter case ignored; a value of only spaces is no value.</description></field>

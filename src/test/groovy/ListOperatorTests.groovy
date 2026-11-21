@@ -94,7 +94,17 @@ class ListOperatorTests extends Specification {
         "not over in, a missing field"          | notOver(compare("02", "status", "ENTCO_IN", '["Open"]'))                   | [:]                           | true
         "not over not in, a missing field"      | notOver(compare("02", "status", "ENTCO_NOT_IN", '["Open"]'))               | [:]                           | false
         "in inside an any"                      | anyOf(compare("02", "status", "ENTCO_IN", '["Open"]'), compare("03", "amount", "ENTCO_EQUALS", "9")) | [status: "Draft", amount: 9] | true
+        "a 300-character list"                  | single("status", "ENTCO_IN", longList(300, "Hit"))                         | [status: "Hit"]               | true
         "not in inside an any, a missing field" | anyOf(compare("02", "status", "ENTCO_NOT_IN", '["Open"]'), compare("03", "amount", "ENTCO_EQUALS", "9")) | [amount: 1] | true
+    }
+
+    /** A JSON list of filler values ending in last, exactly length characters long. */
+    static String longList(int length, String last) {
+        String tail = ',"' + last + '"]'
+        String filler = '["' + 'x' * (length - 3 - tail.length()) + '"'
+        String json = filler + tail
+        assert json.length() == length
+        return json
     }
 
     static List<Map> notOver(Map line) { [[conditionSeqId: "01", conditionTypeId: "RCT_NOT"], line + [parentConditionSeqId: "01"]] }
@@ -122,6 +132,9 @@ class ListOperatorTests extends Specification {
         storeErrors(single("status", "ENTCO_IN", "[{}]")).any { it.contains("status") && it.contains("not a text or a number") }
         storeErrors(single("status", "ENTCO_IN", '[["a"]]')).any { it.contains("status") && it.contains("not a text or a number") }
         storeErrors(single("amount", "ENTCO_IN", '["x"]')).any { it.contains("amount") && it.contains("does not fit") }
+        storeErrors(single("status", "ENTCO_IN", longList(4001, "Hit"))) ==
+                ["Condition 01 of rule list rule: the value for field status is 4001 characters long, more than the 4000 a compare value holds"]
+        storeErrors(single("status", "ENTCO_IN", longList(4000, "Hit"))) == []
     }
 
     def "explain says is one of and is not one of, values in stored order"() {

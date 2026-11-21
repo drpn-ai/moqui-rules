@@ -19,6 +19,15 @@
   unique indexes on `RuleSetRule` are now `RULES_RULE_NAME` and `RULES_RULE_PRIORITY`.
 - **New columns.** `RuleSetCondition.compareFieldName` and `RuleSetCondition.tolerance`; `RuleSetCondition.normalizeText`
   and `RulePieceCondition.normalizeText`.
+- **Wider column.** `compareValue` on `RuleSetCondition` and `RulePieceCondition` is now `text-long` (`VARCHAR(4095)`
+  on H2 and MySQL; it was `text-medium`, `VARCHAR(255)`), so a JSON list fits. An install coming from 0.1.x gets the
+  new width when Moqui creates the `RULES_` tables. Moqui never changes the type of an existing column, so an install
+  that already has the `RULES_` tables widens both by hand:
+  - MySQL: `ALTER TABLE RULES_RULE_SET_CONDITION MODIFY COMPARE_VALUE VARCHAR(4095)` and
+    `ALTER TABLE RULES_RULE_PIECE_CONDITION MODIFY COMPARE_VALUE VARCHAR(4095)`.
+  - H2: `ALTER TABLE RULES_RULE_SET_CONDITION ALTER COLUMN COMPARE_VALUE VARCHAR(4095)` and
+    `ALTER TABLE RULES_RULE_PIECE_CONDITION ALTER COLUMN COMPARE_VALUE VARCHAR(4095)`.
+  - Other databases: change both columns to the database's `text-long` type.
 - **New entities.** `RulePiece`, `RulePieceCondition`, and the view `RuleSetConditionPieceUse`.
 - **Reload the seed** (`data/RuleSeedData.xml`): it adds the condition types `RCT_COMPARE_FIELD` and `RCT_PIECE` and
   the four `FieldPairOperator` enumerations (`FPO_REQUIRES`, `FPO_REQUIRED_BY`, `FPO_ALL_IN`, `FPO_CONTAINS_ALL`).
@@ -29,6 +38,8 @@
 - A compare line with `normalizeText` Y, on a text field with equals, not equals, in, not in, like or not like, trims
   and upper-cases the fact value and the compare values before comparing, and a value of only spaces is no value.
 - An any line takes choices that compare two fields or ignore case; exists lines are still refused there.
+- A compare value, a JSON list included, holds at most 4000 characters; a longer one is refused when the rule or piece
+  is saved, naming the field.
 - `evaluate#RuleSet` judges a batch: each fact may carry a `recordId`. Each entry of `matchedRules` carries
   `recordIds`, the record of each fact the rule matched. The new out-parameter `decisions` gives one answer per fact
   of the decision's single direct fact type, in input order.
