@@ -65,9 +65,13 @@
                                 in-map="[line: row, childLines: childLines, readFactTypeIds: readFactTypeIds, pieceChain: pieceChain ?: []]"/>
                     </else>
                 </if>
-                <if condition="row.normalizeText == 'Y' &amp;&amp; row.conditionTypeId != 'RCT_COMPARE'">
+                <if condition="row.normalizeText != null &amp;&amp; !(row.normalizeText in ['Y', 'N', ''])">
+                    <script>prepared = prepared + [matches: null, notMatches: null, problems: prepared.problems +
+                            ["normalizeText ${row.normalizeText}${row.fieldName ? ' on field ' + row.fieldName : ''} is not Y, N or empty".toString()]]</script>
+                    <else-if condition="row.normalizeText == 'Y' &amp;&amp; row.conditionTypeId != 'RCT_COMPARE'">
                     <script>prepared = prepared + [matches: null, notMatches: null, problems: prepared.problems +
                             ["only a compare line can ignore case and surrounding spaces, not this ${row.conditionTypeId} line${row.fieldName ? ' on field ' + row.fieldName : ''}".toString()]]</script>
+                    </else-if>
                 </if>
                 <script>preparedBySeqId.put(row.conditionSeqId, prepared + [conditionSeqId: row.conditionSeqId, row: row, children: childLines])
                     problems.addAll(prepared.problems.collect { "Condition ${row.conditionSeqId} of rule ${ruleName}: ${it}".toString() })</script>
@@ -197,9 +201,21 @@
     <service verb="prepare" noun="CompareLine" authenticate="anonymous-all" allow-remote="false">
         <implements service="moqui.rules.RuleLineServices.prepare#RuleLine"/>
         <description>Compare one field of a fact with a fixed value, or with a JSON list of them for ENTCO_IN and
-            ENTCO_NOT_IN. With normalizeText Y, on a text field with equals, not equals, in, not in, like or not like, the
-            fact value and the compare values are trimmed and upper-cased before they are compared, and a value of only
-            spaces is no value; a Moqui condition cannot trim, so such a line is a value check.</description>
+            ENTCO_NOT_IN. A compare value holds at most 4000 characters. ENTCO_IN and ENTCO_NOT_IN take a non-empty JSON
+            array of strings, numbers, true or false, each converted to the field's kind from its JSON type: a number field
+            takes numbers (1e2 included) and number strings, a yes/no field takes true and false and the strings true,
+            false, y and n, and on a text field a number is its plain text (1e2 is 100, 1.0 is 1.0). Numbers compare by
+            value (2.5 is in ["2.50"]). normalizeText takes Y, N or nothing. With Y, on a text field with equals, not
+            equals, in, not in, like or not like, a text value is first stripped of leading and trailing characters U+0000
+            to U+0020 (Java String.trim) and upper-cased with Locale.ROOT, which can lengthen it (ß becomes SS); a value
+            that is then empty, or null, is no value, and a compare value that is no value is refused. Without the flag,
+            text compares exactly and an empty text is a value. No value is not equal to, not in and not like anything:
+            equals, in and like do not hold, and not equals, not in and not like do; a missing field is in no list. LIKE
+            patterns: % matches any run of characters including none, _ exactly one UTF-16 unit, both match line breaks,
+            and there is no escape character. LIKE always ignores letter case: both sides are upper-cased with Locale.ROOT,
+            and trimmed only with normalizeText. LIKE and every normalized line are value checks, matched in linear time
+            with no regex. Lines are judged in memory only; SQL &lt;&gt; does not hold for null, so a caller that
+            translates not in or not equals to SQL adds OR field IS NULL.</description>
         <actions>
             <set field="problems" from="[]"/>
             <set field="factTypeIds" from="[line.factTypeId]"/>
@@ -254,7 +270,7 @@
             <set field="holdsValue" from="!(line.operatorEnumId in operatorsWithoutValue)"/>
             <set field="compareValues" from="[]"/>
             <if condition="isListOperator">
-                <!-- the value is a JSON array of one or more strings or numbers, each converted to the field's type -->
+                <!-- the value is a JSON array of one or more strings, numbers, true or false, each converted to the field's type from its JSON type -->
                 <script><![CDATA[
                     Object parsedList = null
                     try { parsedList = new groovy.json.JsonSlurper().parseText(line.compareValue?.toString() ?: "") } catch (Exception ignored) { }
@@ -264,14 +280,17 @@
                         problems.add("the list for field ${line.fieldName} is empty".toString())
                     } else {
                         for (Object element in parsedList) {
-                            if (!(element instanceof CharSequence || element instanceof Number)) {
-                                problems.add("the list for field ${line.fieldName} holds ${element == null ? 'null' : element} which is not a text or a number".toString())
+                            if (!(element instanceof CharSequence || element instanceof Number || element instanceof Boolean)) {
+                                problems.add("the list for field ${line.fieldName} holds ${element == null ? 'null' : element} which is not a text, a number, true or false".toString())
                                 break
                             }
+                            // a number is its plain text, so 1e2 is 100 on a text field and a whole number on a number field
                             Map convertedElement = ec.service.sync().name("moqui.rules.FactValueServices.convert#FactValue")
-                                    .parameters([valueTypeEnumId: fieldValueType, value: element.toString()]).call()
+                                    .parameters([valueTypeEnumId: fieldValueType, value: element instanceof BigDecimal ? element.toPlainString() : element]).call()
                             if (convertedElement.problem) {
                                 problems.add("value ${element} in the list does not fit field ${line.fieldName}".toString())
+                            } else if (normalizeText && org.moqui.rules.ValueChecks.normalizedText(convertedElement.convertedValue) == null) {
+                                problems.add("value \"${element}\" for field ${line.fieldName} is no value once case and surrounding spaces are ignored".toString())
                             } else compareValues.add(convertedElement.convertedValue)
                         }
                     }
@@ -281,6 +300,9 @@
                             in-map="[valueTypeEnumId: fieldValueType, value: line.compareValue]"/>
                     <if condition="line.compareValue == null || convertedCompare.problem">
                         <script>problems.add("value ${line.compareValue} does not fit field ${line.fieldName}".toString())</script>
+                        <else-if condition="normalizeText &amp;&amp; org.moqui.rules.ValueChecks.normalizedText(convertedCompare.convertedValue) == null">
+                            <script>problems.add("value \"${line.compareValue}\" for field ${line.fieldName} is no value once case and surrounding spaces are ignored".toString())</script>
+                        </else-if>
                         <else><script>compareValues.add(convertedCompare.convertedValue)</script></else>
                     </if>
                 </else-if>

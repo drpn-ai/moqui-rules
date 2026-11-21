@@ -16,6 +16,8 @@ class ListOperatorTests extends Specification {
         ec.entity.makeValue("rules.FactType").setAll([factTypeId: factTypeId]).create()
         ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "status", valueTypeEnumId: "FVT_TEXT"]).create()
         ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "amount", valueTypeEnumId: "FVT_DECIMAL"]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "count", valueTypeEnumId: "FVT_INTEGER"]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: factTypeId, fieldName: "flag", valueTypeEnumId: "FVT_BOOLEAN"]).create()
         ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "N"]).create()
         ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
         ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: "FAILS"]).create()
@@ -94,6 +96,13 @@ class ListOperatorTests extends Specification {
         "not over in, a missing field"          | notOver(compare("02", "status", "ENTCO_IN", '["Open"]'))                   | [:]                           | true
         "not over not in, a missing field"      | notOver(compare("02", "status", "ENTCO_NOT_IN", '["Open"]'))               | [:]                           | false
         "in inside an any"                      | anyOf(compare("02", "status", "ENTCO_IN", '["Open"]'), compare("03", "amount", "ENTCO_EQUALS", "9")) | [status: "Draft", amount: 9] | true
+        "a JSON number in exponent form"        | single("amount", "ENTCO_IN", '[1e2]')                                    | [amount: 100]                 | true
+        "a JSON exponent on a whole number"     | single("count", "ENTCO_IN", '[1e2, 7]')                                  | [count: 100]                  | true
+        "a JSON true on a yes/no field"         | single("flag", "ENTCO_IN", '[true]')                                     | [flag: "Y"]                   | true
+        "a JSON true, a no value"               | single("flag", "ENTCO_IN", '[true]')                                     | [flag: false]                 | false
+        "a JSON number on a text field is its plain text" | single("status", "ENTCO_IN", '[1e2, 1.0, 7]')                  | [status: "100"]               | true
+        "a JSON number on a text field, scale kept" | single("status", "ENTCO_IN", '[1e2, 1.0, 7]')                      | [status: "1.0"]               | true
+        "a JSON number on a text field, not its exponent form" | single("status", "ENTCO_IN", '[1e2]')                     | [status: "1E+2"]              | false
         "a 300-character list"                  | single("status", "ENTCO_IN", longList(300, "Hit"))                         | [status: "Hit"]               | true
         "not in inside an any, a missing field" | anyOf(compare("02", "status", "ENTCO_NOT_IN", '["Open"]'), compare("03", "amount", "ENTCO_EQUALS", "9")) | [amount: 1] | true
     }
@@ -129,9 +138,10 @@ class ListOperatorTests extends Specification {
         storeErrors(single("status", "ENTCO_IN", "Open")).any { it.contains("status") && it.contains("not a JSON list") }
         storeErrors(single("status", "ENTCO_IN", "[]")).any { it.contains("status") && it.contains("is empty") }
         storeErrors(single("status", "ENTCO_NOT_IN", "[null]")).any { it.contains("status") && it.contains("null") }
-        storeErrors(single("status", "ENTCO_IN", "[{}]")).any { it.contains("status") && it.contains("not a text or a number") }
-        storeErrors(single("status", "ENTCO_IN", '[["a"]]')).any { it.contains("status") && it.contains("not a text or a number") }
+        storeErrors(single("status", "ENTCO_IN", "[{}]")).any { it.contains("status") && it.contains("not a text, a number, true or false") }
+        storeErrors(single("status", "ENTCO_IN", '[["a"]]')).any { it.contains("status") && it.contains("not a text, a number, true or false") }
         storeErrors(single("amount", "ENTCO_IN", '["x"]')).any { it.contains("amount") && it.contains("does not fit") }
+        storeErrors(single("flag", "ENTCO_IN", '[1]')).any { it.contains("flag") && it.contains("does not fit") }
         storeErrors(single("status", "ENTCO_IN", longList(4001, "Hit"))) ==
                 ["Condition 01 of rule list rule: the value for field status is 4001 characters long, more than the 4000 a compare value holds"]
         storeErrors(single("status", "ENTCO_IN", longList(4000, "Hit"))) == []

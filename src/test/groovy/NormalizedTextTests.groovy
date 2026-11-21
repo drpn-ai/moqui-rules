@@ -162,10 +162,16 @@ class NormalizedTextTests extends Specification {
         "like: leading % then a last letter" | single("code", "ENTCO_LIKE", "%b")                            | [code: "AB"]                 | true
         "like: the last letter must be last" | single("code", "ENTCO_LIKE", "%b")                            | [code: "BA"]                 | false
         "like: _ over an empty value"        | single("code", "ENTCO_LIKE", "_")                             | [code: ""]                   | false
+        "trim takes tabs and line breaks"    | single("code", "ENTCO_EQUALS", "abc")                         | [code: "\tabc\n"]           | true
+        "a tab alone is no value"            | single("code", "ENTCO_NOT_EQUALS", "abc")                     | [code: "\t"]                 | true
+        "upper-casing turns ß into SS"       | single("code", "ENTCO_EQUALS", "strasse")                     | [code: "Straße"]             | true
+        "like: _ is one UTF-16 unit"         | single("code", "ENTCO_LIKE", "__")                            | [code: "\uD83D\uDE00"]       | true
+        "like: % matches a line break"       | single("code", "ENTCO_LIKE", "a%b")                           | [code: "a\nb"]               | true
         "plain like ignores letter case"     | single("code", "ENTCO_LIKE", "ab%", null)                     | [code: "ABCD"]               | true
         "plain like does not trim"           | single("code", "ENTCO_LIKE", "ab%", null)                     | [code: " ABCD"]              | false
         "plain like: ß matches SS"           | single("code", "ENTCO_LIKE", "%ss%", null)                    | [code: "Straße"]             | true
         "plain not like, a missing field"    | single("code", "ENTCO_NOT_LIKE", "ab%", null)                 | [:]                          | true
+        "flag N compares exactly"            | single("code", "ENTCO_EQUALS", "abc", "N")                    | [code: "ABC"]                | false
         "not over all, the normalized line fails" | notOverAll(codeAbc("03"), qtyNine("04"))                 | [code: "x", qty: 9]          | true
         "not over all, both lines hold"      | notOverAll(codeAbc("03"), qtyNine("04"))                      | [code: " ABC", qty: 9]       | false
         "not over all, the plain line fails" | notOverAll(codeAbc("03"), qtyNine("04"))                      | [code: "abc", qty: 1]        | true
@@ -186,6 +192,19 @@ class NormalizedTextTests extends Specification {
                 ["Condition 01 of rule norm rule: only a compare line can ignore case and surrounding spaces, not this RCT_COMPARE_FIELD line on field a"]
         storeErrors([[conditionSeqId: "01", conditionTypeId: "RCT_ALL", normalizeText: "Y"], codeAbc("02") + [parentConditionSeqId: "01"]]) ==
                 ["Condition 01 of rule norm rule: only a compare line can ignore case and surrounding spaces, not this RCT_ALL line"]
+    }
+
+    def "a compare value that is blank once spaces are ignored, and a flag other than Y, N or empty, are refused"() {
+        expect:
+        storeErrors(single("code", "ENTCO_EQUALS", "   ")) ==
+                ['Condition 01 of rule norm rule: value "   " for field code is no value once case and surrounding spaces are ignored']
+        storeErrors(single("code", "ENTCO_IN", '["  ","A"]')) ==
+                ['Condition 01 of rule norm rule: value "  " for field code is no value once case and surrounding spaces are ignored']
+        storeErrors(single("code", "ENTCO_EQUALS", "abc", "true")) ==
+                ["Condition 01 of rule norm rule: normalizeText true on field code is not Y, N or empty"]
+        storeErrors([[conditionSeqId: "01", conditionTypeId: "RCT_ALL", normalizeText: "y"], codeAbc("02") + [parentConditionSeqId: "01"]]) ==
+                ["Condition 01 of rule norm rule: normalizeText y is not Y, N or empty"]
+        storeErrors(single("code", "ENTCO_EQUALS", "   ", "N")) == []
     }
 
     def "explain agrees with evaluate on a not line over an all line, a two-line piece and a not line"() {

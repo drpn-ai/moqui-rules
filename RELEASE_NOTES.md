@@ -18,7 +18,9 @@
   index names are the ones the new tables use, which clash on databases where those names are schema-wide. The two
   unique indexes on `RuleSetRule` are now `RULES_RULE_NAME` and `RULES_RULE_PRIORITY`.
 - **New columns.** `RuleSetCondition.compareFieldName` and `RuleSetCondition.tolerance`; `RuleSetCondition.normalizeText`
-  and `RulePieceCondition.normalizeText`.
+  and `RulePieceCondition.normalizeText`. Moqui adds a missing column on start (`entity_add_missing_startup`, on by
+  default). With add-missing off, add them by hand, for example
+  `ALTER TABLE RULES_RULE_SET_CONDITION ADD NORMALIZE_TEXT CHAR(1)` and the same on `RULES_RULE_PIECE_CONDITION`.
 - **Wider column.** `compareValue` on `RuleSetCondition` and `RulePieceCondition` is now `text-long` (`VARCHAR(4095)`
   on H2 and MySQL; it was `text-medium`, `VARCHAR(255)`), so a JSON list fits. An install coming from 0.1.x gets the
   new width when Moqui creates the `RULES_` tables. Moqui never changes the type of an existing column, so an install
@@ -34,12 +36,30 @@
 
 ### Behaviour changes
 
-- Compare lines take `ENTCO_IN` and `ENTCO_NOT_IN` with a JSON array `compareValue`; a missing field is not one of any list.
-- A compare line with `normalizeText` Y, on a text field with equals, not equals, in, not in, like or not like, trims
-  and upper-cases the fact value and the compare values before comparing, and a value of only spaces is no value.
-- An any line takes choices that compare two fields or ignore case; exists lines are still refused there.
+- Compare lines take `ENTCO_IN` and `ENTCO_NOT_IN` with a `compareValue` that is a non-empty JSON array of strings,
+  numbers, `true` or `false`. Each element is converted to the field's kind from its JSON type: a number field takes
+  numbers (`1e2` included) and number strings; a yes/no field takes `true`, `false` and the strings true, false, y and
+  n; on a text field a number is its plain text (`1e2` is `"100"`, `1.0` is `"1.0"`). Numbers compare by value (`2.5`
+  is in `["2.50"]`). A missing field is in no list, so `ENTCO_NOT_IN` holds for it.
 - A compare value, a JSON list included, holds at most 4000 characters; a longer one is refused when the rule or piece
   is saved, naming the field.
+- `normalizeText` takes `Y`, `N` or nothing; any other value is refused, naming it. With `Y`, on a text field with
+  equals, not equals, in, not in, like or not like, a text value is first stripped of leading and trailing characters
+  U+0000 to U+0020 (Java `String.trim`: spaces, tabs, line breaks and the other control characters) and upper-cased
+  with `Locale.ROOT`, which can lengthen it (`ß` becomes `SS`). A value that is then empty, or null, is no value. A
+  compare value or list element that is no value is refused when the rule or piece is saved. Without the flag, equals,
+  not equals, in and not in compare text exactly and with case, and an empty text is a value.
+- No value (a missing field, null, or with `normalizeText` a blank text) is not equal to, not in and not like
+  anything: `=`, `in` and `like` do not hold, and `!=`, `not in` and `not like` do.
+- LIKE and NOT LIKE patterns: `%` matches any run of characters including none, `_` exactly one UTF-16 unit, and both
+  match line breaks. There is no escape character, so a literal `%` or `_` cannot be matched. LIKE always ignores
+  letter case: both sides are upper-cased with `Locale.ROOT`. Without `normalizeText` nothing is trimmed (`ab%` does
+  not match `" abcd"`); with it both sides are trimmed first. Every LIKE line is a value check matched in linear time,
+  with no regex; before, a LIKE line without the flag ran Moqui's regular expression, ignoring ASCII case only and
+  taking `_` as one code point.
+- Rule-line conditions are judged in memory only, never sent to SQL. SQL `<>` does not hold for null, so a caller
+  that translates `ENTCO_NOT_IN` or `ENTCO_NOT_EQUALS` to SQL must add `OR field IS NULL`.
+- An any line takes choices that compare two fields, ignore case or use LIKE; exists lines are still refused there.
 - `evaluate#RuleSet` judges a batch: each fact may carry a `recordId`. Each entry of `matchedRules` carries
   `recordIds`, the record of each fact the rule matched. The new out-parameter `decisions` gives one answer per fact
   of the decision's single direct fact type, in input order.
@@ -53,8 +73,9 @@
   or rolled back); a build that a clear overtakes is answered with but not kept.
 - Value comparisons between two fields are exact: text is not trimmed, so `"SKU1 "` and `"SKU1"` differ. Numbers are
   still compared as numbers.
-- A not line over an all line or a piece with one line under it works for any line, a compare-two-fields line
-  included.
+- A not line works over an all line, a piece or another not line whatever lines are under them, value checks
+  (compare two fields, `normalizeText`, LIKE) included. An exists line still turns around only alone: directly under
+  a not line, or as the one line of an all line or a piece under one.
 - A host app's entity filter on `rules.RuleSetRule` or `rules.RuleSetCondition` applies through the views
   `RuleSetConditionAndRule` and `RuleSetConditionPieceUse`: they alias every field of their members (rule fields
   prefixed `rule`, piece-use line fields prefixed `line`). Before, such a filter made every read of the view fail.

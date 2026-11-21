@@ -6,7 +6,11 @@ package org.moqui.rules
  * <li>two fields of the same fact (fieldName, compareFieldName): equals within a tolerance, requires, required by, all in
  * and contains all. A side that was not read (null) claims nothing, where noted.</li>
  * <li>one field against fixed values (fieldName, values, normalizeText): =, !=, in, not in, like, not like. With
- * normalizeText, text is trimmed and upper-cased first and a value of only spaces is no value.</li>
+ * normalizeText, a text value is first stripped of leading and trailing characters U+0000 to U+0020 (String.trim) and
+ * upper-cased with Locale.ROOT, which can lengthen it (ß becomes SS); a value that is then empty, or null, is no value.
+ * Without it, =, !=, in and not in compare exactly. No value is not equal to, not in and not like anything: =, in and
+ * like do not hold, !=, not in and not like do. like always ignores letter case: both sides are upper-cased with
+ * Locale.ROOT, and trimmed only with normalizeText. See likeMatches for the pattern.</li>
  * <li>any (choices): some choice's full match holds, judged by ItemChecks.matches.</li>
  * </ul>
  */
@@ -49,8 +53,8 @@ class ValueChecks {
     }
 
     /**
-     * A like pattern: % is any run of characters, empty included, _ is exactly one character, everything else is
-     * itself. Greedy two-pointer matching that goes back only to the last %, so it takes at most text length times
+     * A like pattern: % is any run of characters, empty included, _ is exactly one UTF-16 unit, both match line breaks,
+     * and everything else is itself: there is no escape character, so a literal % or _ cannot be matched. Greedy two-pointer matching that goes back only to the last %, so it takes at most text length times
      * pattern length steps, however many % the pattern has; no regex backtracking on fact text from outside systems.
      */
     static boolean likeMatches(String text, String pattern) {
