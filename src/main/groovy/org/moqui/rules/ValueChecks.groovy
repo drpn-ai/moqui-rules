@@ -31,7 +31,7 @@ class ValueChecks {
         Object fact = folded(value, normalizeText, like)
         boolean found = fact != null && listed.any { Object listedValue ->
             Object one = folded(listedValue, normalizeText, like)
-            one != null && (like ? likeMatches((String) fact, (String) one) : (normalizeText ? fact == one : equalValues(fact, one))) }
+            one != null && (like ? likeMatches((String) fact, (String) one) : fact == one) }
         switch (kind) {
             case "=": case "in": case "like": return found
             case "!=": case "not in": case "not like": return !found
