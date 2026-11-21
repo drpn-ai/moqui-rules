@@ -251,16 +251,13 @@
                     }
                 ]]></script>
                 <if condition="problems"><return/></if>
-                <!-- plain conditions, so the line can sit under any and not; a missing field is in no list, so is not in every list -->
+                <!-- plain conditions, so the line can sit under any and not; a missing field is not equal to any value, so is in no list -->
                 <set field="conditionFactory" from="ec.entity.conditionFactory"/>
                 <!-- one equals per value, not an IN list: equals compares numbers by value, a list compares the exact BigDecimal scale -->
                 <set field="inCondition" from="conditionFactory.makeCondition(listValues.collect { conditionFactory.makeCondition(line.fieldName,
                         org.moqui.entity.EntityCondition.ComparisonOperator.EQUALS, it) }, org.moqui.entity.EntityCondition.OR)"/>
-                <set field="notInCondition" from="conditionFactory.makeCondition([
-                        conditionFactory.makeCondition(line.fieldName, org.moqui.entity.EntityCondition.ComparisonOperator.IS_NULL, null),
-                        conditionFactory.makeCondition(listValues.collect { conditionFactory.makeCondition(line.fieldName,
-                                org.moqui.entity.EntityCondition.ComparisonOperator.NOT_EQUAL, it) }, org.moqui.entity.EntityCondition.AND)],
-                        org.moqui.entity.EntityCondition.OR)"/>
+                <set field="notInCondition" from="conditionFactory.makeCondition(listValues.collect { conditionFactory.makeCondition(line.fieldName,
+                        org.moqui.entity.EntityCondition.ComparisonOperator.NOT_EQUAL, it) }, org.moqui.entity.EntityCondition.AND)"/>
                 <set field="isIn" from="line.operatorEnumId == 'ENTCO_IN'"/>
                 <set field="matches" from="[condition: isIn ? inCondition : notInCondition, itemChecks: [], valueChecks: []]"/>
                 <set field="notMatches" from="[condition: isIn ? notInCondition : inCondition, itemChecks: [], valueChecks: []]"/>
