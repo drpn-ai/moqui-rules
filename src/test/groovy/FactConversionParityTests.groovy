@@ -2,6 +2,7 @@ import java.sql.Timestamp
 import spock.lang.*
 import org.moqui.context.ExecutionContext
 import org.moqui.Moqui
+import org.moqui.rules.FactConverter
 
 /**
  * Pins what fact conversion gives today, value for value: the converted value and its class, the problem text,
@@ -129,7 +130,8 @@ class FactConversionParityTests extends Specification {
                 stamp: "FVT_DATE_TIME", items: "FVT_LIST"])
         ec.entity.makeValue("rules.FactField").setAll([factTypeId: "ParityFact", fieldName: "items", valueTypeEnumId: "FVT_LIST",
                 itemFactTypeId: "ParityItem"]).update()
-        // a field whose kind is neither a single value nor a list
+        // a field whose kind is neither a single value nor a list: a node-type enum on purpose, because convert#FactValue
+        // refuses any kind that is not a FactValueType
         createFactType("ParityOdd", [odd: "FNT_RECORD"])
     }
 
@@ -206,5 +208,86 @@ class FactConversionParityTests extends Specification {
         values     || expectedProblems
         [:]        || ["Value null does not fit field odd of ParityOdd"]
         [odd: "x"] || ["Value x does not fit field odd of ParityOdd"]
+    }
+
+    def "convertAll gives the same results as convertFact one at a time: #name"() {
+        when:
+        List<Map> results = new FactConverter(ec).convertAll([[factTypeId: "ParityFact", values: values]])
+
+        then:
+        results.size() == 1
+        results[0].fact == expectedFact
+        results[0].fact.collectEntries { k, v -> [k, v?.getClass()] } == expectedFact.collectEntries { k, v -> [k, v?.getClass()] }
+        results[0].problems == expectedProblems
+
+        where:
+        [name, values, expectedFact, expectedProblems] << FACT_CASES
+    }
+
+    def "convertAll keeps order and does not let a bad fact shift its neighbours"() {
+        when:
+        List<Map> results = new FactConverter(ec).convertAll([
+                [factTypeId: "ParityFact", values: [qty: "1"]],
+                [factTypeId: "ParityFact", values: [qty: "x"]],
+                [factTypeId: "ParityItem", values: [count: "3"]]])
+
+        then:
+        results*.problems == [[], ["Value x does not fit field qty of ParityFact"], []]
+        results[0].fact.qty == 1L
+        results[2].fact == [count: 3L, name: null]
+    }
+
+    def "a field that is neither a single value nor a list: convertAll agrees with convertFact"() {
+        expect:
+        new FactConverter(ec).convertAll([[factTypeId: "ParityOdd", values: [:]]]) ==
+                [[fact: [:], problems: ["Value null does not fit field odd of ParityOdd"]]]
+    }
+
+    def "a value kind change is used by the next call"() {
+        given:
+        FactConverter converter = new FactConverter(ec)
+        Map before = converter.convertFact("ParityItem", [count: "12.5"])
+
+        when:
+        ec.service.sync().name("moqui.rules.RuleServices.update#FactField")
+                .parameters([factTypeId: "ParityItem", fieldName: "count", valueTypeEnumId: "FVT_DECIMAL"]).call()
+        Map after = new FactConverter(ec).convertFact("ParityItem", [count: "12.5"])
+
+        then:
+        before.problems == ["Value 12.5 does not fit field count of ParityItem"]
+        after.problems == []
+        after.fact.count == new BigDecimal("12.5")
+
+        cleanup:
+        ec.service.sync().name("moqui.rules.RuleServices.update#FactField")
+                .parameters([factTypeId: "ParityItem", fieldName: "count", valueTypeEnumId: "FVT_INTEGER"]).call()
+        ec.message.clearAll()
+    }
+
+    /**
+     * How many times the artifact of the given name ran, anywhere in this execution context's history tree. Counted
+     * on the printed history: ArtifactExecutionInfo.getChildList throws on an artifact that has no children.
+     */
+    int hits(String name) {
+        return ec.artifactExecution.printHistory().split("\n").count { it.contains(name) }
+    }
+
+    def "a batch does not call a service per value"() {
+        given:
+        String valueService = "moqui.rules.FactValueServices.convert#FactValue"
+        // the counter sees a service call at all: one call of the service shows up once
+        int base = hits(valueService)
+        convert("FVT_TEXT", "x")
+        assert hits(valueService) == base + 1
+        List<Map> entries = (1..200).collect { [factTypeId: "ParityItem", values: [name: "n" + it, count: "5", extra: 1]] }
+        int beforeBatch = hits(valueService)
+
+        when:
+        List<Map> results = new FactConverter(ec).convertAll(entries)
+
+        then:
+        results.size() == 200
+        results.every { it.fact.count == 5L }
+        hits(valueService) == beforeBatch
     }
 }

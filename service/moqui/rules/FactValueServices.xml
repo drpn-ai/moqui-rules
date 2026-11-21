@@ -23,33 +23,9 @@
                 <set field="problem" value="value kind ${valueTypeEnumId} does not hold a single value"/>
                 <return/>
             </if>
-            <if condition="value == null"><return/></if>
-            <set field="text" from="value.toString().trim()"/>
-            <set field="number" from="value instanceof Number ? new BigDecimal(value.toString()) :
-                    text ==~ /[+-]?(\d+(\.\d*)?|\.\d+)/ ? new BigDecimal(text) : null"/>
-
-            <if condition="typeName == 'String'">
-                <set field="convertedValue" from="value.toString()"/>
-                <else-if condition="typeName == 'Long'">
-                    <if condition="number == null || number.stripTrailingZeros().scale() &gt; 0 || number.abs() &gt; Long.MAX_VALUE">
-                        <set field="problem" value="${value} is not a whole number"/>
-                        <else><set field="convertedValue" from="number.longValue()"/></else>
-                    </if>
-                </else-if>
-                <else-if condition="typeName == 'BigDecimal'">
-                    <set field="convertedValue" from="number"/>
-                    <if condition="convertedValue == null"><set field="problem" value="${value} is not a number"/></if>
-                </else-if>
-                <else-if condition="typeName == 'Boolean'">
-                    <set field="convertedValue" from="value instanceof Boolean ? value : ['true': true, 'y': true, 'false': false, 'n': false].get(text.toLowerCase())"/>
-                    <if condition="convertedValue == null"><set field="problem" value="${value} is not yes or no"/></if>
-                </else-if>
-                <else>
-                    <set field="convertedValue" from="value instanceof java.sql.Timestamp ? value : value instanceof Date ?
-                            new java.sql.Timestamp(value.time) : ec.l10n.parseTimestamp(text, null)"/>
-                    <if condition="convertedValue == null"><set field="problem" value="${value} is not a date and time"/></if>
-                </else>
-            </if>
+            <set field="converted" from="org.moqui.rules.FactConverter.convertValue(ec, typeName, value)"/>
+            <set field="convertedValue" from="converted.convertedValue"/>
+            <set field="problem" from="converted.problem"/>
         </actions>
     </service>
 
