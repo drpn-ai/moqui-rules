@@ -1,7 +1,5 @@
 package org.moqui.rules
 
-import java.util.regex.Pattern
-
 /**
  * What a line checks when a Moqui condition cannot say it. Three forms:
  * <ul>
@@ -43,15 +41,29 @@ class ValueChecks {
         return text?.toUpperCase(Locale.ROOT)
     }
 
-    /** A like pattern: % is any run of characters, _ is one character, everything else is itself. */
+    /**
+     * A like pattern: % is any run of characters, empty included, _ is exactly one character, everything else is
+     * itself. Greedy two-pointer matching that goes back only to the last %, so it takes at most text length times
+     * pattern length steps, however many % the pattern has; no regex backtracking on fact text from outside systems.
+     */
     static boolean likeMatches(String text, String pattern) {
-        StringBuilder regex = new StringBuilder()
-        for (char c in pattern.toCharArray()) {
-            if (c == ('%' as char)) regex.append(".*")
-            else if (c == ('_' as char)) regex.append(".")
-            else regex.append(Pattern.quote(String.valueOf(c)))
+        int t = 0, p = 0, lastPercent = -1, textAtPercent = 0
+        while (t < text.length()) {
+            if (p < pattern.length() && pattern.charAt(p) != ('%' as char) &&
+                    (pattern.charAt(p) == ('_' as char) || pattern.charAt(p) == text.charAt(t))) {
+                t++; p++
+            } else if (p < pattern.length() && pattern.charAt(p) == ('%' as char)) {
+                lastPercent = p++
+                textAtPercent = t
+            } else if (lastPercent >= 0) {
+                p = lastPercent + 1
+                t = ++textAtPercent
+            } else {
+                return false
+            }
         }
-        return Pattern.compile(regex.toString(), Pattern.DOTALL).matcher(text).matches()
+        while (p < pattern.length() && pattern.charAt(p) == ('%' as char)) p++
+        return p == pattern.length()
     }
 
     static boolean evaluate(String kind, Object a, Object b, BigDecimal tolerance) {

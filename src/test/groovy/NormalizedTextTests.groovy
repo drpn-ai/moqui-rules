@@ -136,6 +136,13 @@ class NormalizedTextTests extends Specification {
         "neither choice"                     | anyOf(codeAbc("02"), qtyNine("03"))                           | [code: "x", qty: 1]          | false
         "not over that any"                  | notOverAny(codeAbc("03"), qtyNine("04"))                      | [code: "abc"]                | false
         "compare-two-fields inside an any"   | anyOf(aEqualsB("02"), qtyNine("03"))                          | [a: "x", b: "x", qty: 1]     | true
+        "like: _ is one character"           | single("code", "ENTCO_LIKE", "a_c")                           | [code: "ABC"]                | true
+        "like: _ is not zero characters"     | single("code", "ENTCO_LIKE", "a_c")                           | [code: "AC"]                 | false
+        "like: % alone matches anything"     | single("code", "ENTCO_LIKE", "%")                             | [code: "X"]                  | true
+        "like: %% matches an empty run"      | single("code", "ENTCO_LIKE", "a%%c")                          | [code: "AC"]                 | true
+        "like: leading % then a last letter" | single("code", "ENTCO_LIKE", "%b")                            | [code: "AB"]                 | true
+        "like: the last letter must be last" | single("code", "ENTCO_LIKE", "%b")                            | [code: "BA"]                 | false
+        "like: _ over an empty value"        | single("code", "ENTCO_LIKE", "_")                             | [code: ""]                   | false
     }
 
     def "the flag is refused off a text compare line with an operator it fits, naming the field and the reason"() {
@@ -166,6 +173,25 @@ class NormalizedTextTests extends Specification {
         overAny.rules[0].lines*.holds == [true]
         overAny.rules[0].lines[0].lines*.text == ["code equals abc (ignoring case and surrounding spaces)", "qty equals 9"]
         overAny.rules[0].lines[0].lines*.holds == [true, false]
+    }
+
+    def "a like pattern with many wildcards stays fast on long text"() {
+        given:
+        assert storeErrors(single("code", "ENTCO_LIKE", "%a%a%a%a%a%a%a%a%b")) == []
+        ((RuleSets) ec.getTool("Rules", RuleSets.class)).builtRuleSet(ruleSetId)
+        String longText = "a" * 20000
+
+        when:
+        long started = System.nanoTime()
+        Map result = ec.service.sync().name("moqui.rules.RuleServices.evaluate#RuleSet")
+                .parameters([ruleSetId: ruleSetId, facts: [[factTypeId: factTypeId, fact: [code: longText]]]]).call()
+        long elapsedMillis = (System.nanoTime() - started).intdiv(1000000L)
+        println "like over 20000 characters took ${elapsedMillis} ms"
+
+        then:
+        !ec.message.hasError()
+        result.outcomes == []
+        elapsedMillis < 1000
     }
 
     List<EntityValue> normalizeTextAudit(String ruleId) {
