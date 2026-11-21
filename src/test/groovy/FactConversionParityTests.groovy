@@ -71,6 +71,9 @@ class FactConversionParityTests extends Specification {
         ["FVT_BOOLEAN", false, false, null],
         // date and time: a Timestamp stays, a Date keeps its instant, text goes through Moqui's parser
         ["FVT_DATE_TIME", null, null, null],
+        ["FVT_DATE_TIME", "", null, " is not a date and time"],
+        ["FVT_DATE_TIME", "  ", null, "   is not a date and time"],
+        // zone: text is read in john.doe's seeded zone (six hours behind UTC in November), so 10:15 there is 16:15 UTC
         ["FVT_DATE_TIME", "2026-11-03 10:15:00", new Timestamp(1793722500000L), null],
         ["FVT_DATE_TIME", " 2026-11-03 10:15:00 ", new Timestamp(1793722500000L), null],
         ["FVT_DATE_TIME", new Date(1700000000000L), new Timestamp(1700000000000L), null],
