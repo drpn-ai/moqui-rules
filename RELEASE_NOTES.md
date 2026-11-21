@@ -41,6 +41,9 @@
   numbers (`1e2` included) and number strings; a yes/no field takes `true`, `false` and the strings true, false, y and
   n; on a text field a number is its plain text (`1e2` is `"100"`, `1.0` is `"1.0"`). Numbers compare by value (`2.5`
   is in `["2.50"]`). A missing field is in no list, so `ENTCO_NOT_IN` holds for it.
+- A compare line that needs a value (every operator except `ENTCO_IS_NULL` and `ENTCO_IS_NOT_NULL`), in a rule or a piece, is refused
+  at save when its `compareValue` is null or empty, naming the field; Moqui stores an empty string as null, so such a rule
+  saved but could not run. To test for no value use is null or is not null.
 - A compare value, a JSON list included, holds at most 4000 characters; a longer one is refused when the rule or piece
   is saved, naming the field.
 - `normalizeText` takes `Y`, `N` or nothing; any other value is refused, naming it. With `Y`, on a text field with

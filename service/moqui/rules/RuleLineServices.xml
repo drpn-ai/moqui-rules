@@ -209,7 +209,8 @@
             equals, in, not in, like or not like, a text value is first stripped of leading and trailing characters U+0000
             to U+0020 (Java String.trim) and upper-cased with Locale.ROOT, which can lengthen it (ß becomes SS); a value
             that is then empty, or null, is no value, and a compare value that is no value is refused. Without the flag,
-            text compares exactly and an empty text is a value. No value is not equal to, not in and not like anything:
+            text compares exactly. A line that needs a value (every operator but is null and is not null) with no compare
+            value, null or empty, is refused: to test for no value use is null or is not null. No value is not equal to, not in and not like anything:
             equals, in and like do not hold, and not equals, not in and not like do; a missing field is in no list. LIKE
             patterns: % matches any run of characters including none, _ exactly one UTF-16 unit, both match line breaks,
             and there is no escape character. LIKE always ignores letter case: both sides are upper-cased with Locale.ROOT,
@@ -295,6 +296,9 @@
                         }
                     }
                 ]]></script>
+                <else-if condition="holdsValue &amp;&amp; (line.compareValue == null || line.compareValue.toString() == '')">
+                    <script>problems.add("field ${line.fieldName} has no compare value; to test for no value use is null or is not null".toString())</script>
+                </else-if>
                 <else-if condition="holdsValue">
                     <service-call name="moqui.rules.FactValueServices.convert#FactValue" out-map="convertedCompare" out-map-add-to-existing="false"
                             in-map="[valueTypeEnumId: fieldValueType, value: line.compareValue]"/>

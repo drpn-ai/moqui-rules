@@ -13,7 +13,9 @@ class LineKindTests extends Specification {
         ec.artifactExecution.disableAuthz()
         removeDecision()
         ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: ruleSetId, firstMatchOnly: "N"]).create()
-        for (String factTypeId in ["checkResult", "salesOrder"])
+        ec.entity.makeValue("rules.FactType").setAll([factTypeId: "RULES_TEST_LK_ADDRESS"]).create()
+        ec.entity.makeValue("rules.FactField").setAll([factTypeId: "RULES_TEST_LK_ADDRESS", fieldName: "city", valueTypeEnumId: "FVT_TEXT"]).create()
+        for (String factTypeId in ["checkResult", "salesOrder", "RULES_TEST_LK_ADDRESS"])
             ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: ruleSetId, factTypeId: factTypeId]).create()
         for (String outcomeId in ["NEITHER", "NO_DIGITAL"])
             ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: ruleSetId, outcomeId: outcomeId]).create()
@@ -27,6 +29,9 @@ class LineKindTests extends Specification {
 
     def cleanupSpec() {
         removeDecision()
+        ec.entity.find("rules.RulePiece").condition("pieceId", "RULES_TEST_LK_EMPTY_CITY").deleteAll()
+        ec.entity.find("rules.FactField").condition("factTypeId", "RULES_TEST_LK_ADDRESS").deleteAll()
+        ec.entity.find("rules.FactType").condition("factTypeId", "RULES_TEST_LK_ADDRESS").deleteAll()
         ec.artifactExecution.enableAuthz()
         ec.user.logoutUser()
         ec.destroy()
@@ -114,5 +119,29 @@ class LineKindTests extends Specification {
         "all" | "RCT_ALL"       || "an all line needs at least one line under it"
         "any" | "RCT_ANY"       || "an any line needs at least one line under it"
         "not" | "RCT_NOT"       || "a not line needs at least one line under it"
+    }
+
+    def "a compare line that needs a value is refused without one, naming the field, in a rule and in a piece; is null needs none"() {
+        given:
+        String message = "field city has no compare value; to test for no value use is null or is not null"
+        Map emptyCity = [conditionSeqId: "01", conditionTypeId: "RCT_COMPARE", factTypeId: "RULES_TEST_LK_ADDRESS", fieldName: "city",
+                         operatorEnumId: "ENTCO_EQUALS", compareValue: ""]
+        Map nullCity = emptyCity + [operatorEnumId: "ENTCO_IS_NULL"]
+        nullCity.remove("compareValue")
+
+        expect:
+        storeRule("empty city", 50, "NEITHER", [emptyCity]) == ["Condition 01 of rule empty city: ${message}".toString()]
+        storeRule("null city", 50, "NEITHER", [emptyCity + [compareValue: null]]) == ["Condition 01 of rule null city: ${message}".toString()]
+        storePiece("EMPTY_CITY", [emptyCity]) == ["Condition 01 of rule piece RULES_TEST_LK_EMPTY_CITY: ${message}".toString()]
+        storeRule("no city", 50, "NEITHER", [nullCity]) == []
+    }
+
+    List<String> storePiece(String name, List<Map> lines) {
+        ec.message.clearAll()
+        ec.service.sync().name("moqui.rules.RuleServices.store#Piece").parameters([pieceId: "RULES_TEST_LK_" + name,
+                factTypeId: "RULES_TEST_LK_ADDRESS", conditions: lines]).call()
+        List<String> errors = ec.message.errors.collect()
+        ec.message.clearAll()
+        return errors
     }
 }
