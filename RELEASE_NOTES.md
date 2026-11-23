@@ -86,6 +86,9 @@
   `disable-authz`), so it finds every decision a changed row touches whatever filters the writer has.
 - `build#Fact` reads the fact type with the caller's permissions before its built-fact cache: a fact type the caller
   cannot see answers "Fact type X does not exist", even when another caller built it.
+- Facts are converted in bulk, with no service call per value. The new `convert#Facts` service converts many facts at
+  once; `convert#Fact` is a shell over the same code, and `evaluate#RuleSet` and `check#File` make one `convert#Facts`
+  call per batch. The per-value conversion and the copying of fact values into the rules are statically compiled.
 
 ### New services
 
