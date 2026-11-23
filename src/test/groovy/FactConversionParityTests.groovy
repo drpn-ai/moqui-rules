@@ -352,5 +352,16 @@ class FactConversionParityTests extends Specification {
         out.checkedRecords[1].refusedReasons == ["Value zz does not fit field count of ParityItem"]
         out.checkedRecords[1].outcomes == null
         out.checkedRecords[2].outcomes == ["PARITY_OK"]
+
+        when: "a row the file read already refuses also holds a value that does not fit"
+        Map refused = ec.service.sync().name("moqui.rules.RuleServices.check#File").parameters([ruleSetId: CHECK_SET, factTypeId: "ParityItem",
+                fileName: "items.csv", fileText: "name,count\na,1\nb,zz,extra\n"]).call()
+
+        then: "the read problem comes first, then the conversion problem"
+        !ec.message.hasError()
+        refused.checkedRecords[0].refusedReasons == null
+        refused.checkedRecords[1].refusedReasons == ["It has 3 values, but the file has 2 columns",
+                                                      "Value zz does not fit field count of ParityItem"]
+        refused.checkedRecords[1].outcomes == null
     }
 }

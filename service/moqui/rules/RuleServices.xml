@@ -290,7 +290,8 @@
             entries. It reports every problem per fact and adds no errors, so the caller decides what a problem means.</description>
         <in-parameters>
             <parameter name="entries" type="List"><description>Maps of factTypeId and values, the values being a Map of
-                field values. None gives no results.</description></parameter>
+                field values; each entry needs a factTypeId. Optional because an empty list is allowed: no entries gives
+                no results.</description></parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="results" type="List"><description>One map of fact and problems per entry, in input order.</description></parameter>
@@ -307,8 +308,8 @@
         <in-parameters>
             <parameter name="ruleSetId" required="true"/>
             <parameter name="facts" type="List" required="true"><description>Maps of factTypeId, fact and recordId, the fact
-                being a Map of field values and recordId optional text naming the caller's record. A record id may be
-                used once per call.</description></parameter>
+                being a Map of field values (each fact must be a Map) and recordId optional text naming the caller's record.
+                A record id may be used once per call.</description></parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="outcomes" type="List"><description>Outcome ids over all facts, highest priority first. Only the first when the decision has firstMatchOnly Y.</description></parameter>

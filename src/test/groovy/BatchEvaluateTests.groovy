@@ -141,6 +141,27 @@ class BatchEvaluateTests extends Specification {
                               "Value x does not fit field refusedCount of checkResult"]
     }
 
+    def "problems come in input order, a bad value before a fact type not read, and a repeated record id comes last"() {
+        when:
+        Map out = evaluate([[factTypeId: "checkResult", recordId: "A", fact: [refusedCount: "x"]],
+                            [factTypeId: "batchTestA", recordId: "A", fact: [code: "a"]]])
+        then:
+        out == null || out.outcomes == null
+        ec.message.errors == ["Value x does not fit field refusedCount of checkResult",
+                              "Decision RULES_TEST_BATCH does not read fact type batchTestA",
+                              "Record id A is given more than once"]
+    }
+
+    def "a bad value listed first comes before a fact type the decision does not read"() {
+        when:
+        Map out = evaluate([[factTypeId: "checkResult", recordId: "B", fact: [refusedCount: "x"]],
+                            [factTypeId: "batchTestA", recordId: "C", fact: [code: "a"]]])
+        then:
+        out == null || out.outcomes == null
+        ec.message.errors == ["Value x does not fit field refusedCount of checkResult",
+                              "Decision RULES_TEST_BATCH does not read fact type batchTestA"]
+    }
+
     def "a 500-fact batch decides the same as 500 single-fact calls"() {
         given:
         List<Map> facts = (1..500).collect {

@@ -115,10 +115,10 @@ class BuiltRuleSet {
     /**
      * Puts each value of a fact on its instance, in the fact's key order. Statically compiled: it runs for every value of
      * every fact, and dynamic dispatch on values of several classes relinks its call site value after value.
+     * Keys are field names (Strings); a non-String key is turned into text by the cast.
      */
     @CompileStatic
     private static void copyValues(Map values, PrototypeFactInstance factInstance) {
-        if (values == null) return
         for (Object e in values.entrySet()) {
             Map.Entry entry = (Map.Entry) e
             factInstance.put((String) entry.getKey(), entry.getValue())
