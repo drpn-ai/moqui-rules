@@ -89,9 +89,13 @@
 - Facts are converted in bulk, with no service call per value. The new `convert#Facts` service converts many facts at
   once; `convert#Fact` is a shell over the same code, and `evaluate#RuleSet` and `check#File` make one `convert#Facts`
   call per batch. The per-value conversion and the copying of fact values into the rules are statically compiled.
+- A text value holding `<` is converted as text by `convert#Fact`, `convert#Facts`, `evaluate#RuleSet` and `check#File`
+  instead of failing the call; `convert#FactValue` called directly still refuses it.
 
 ### New services
 
+- `convert#Facts`: converts a list of facts of any types in one call, giving each its converted fact and problems, as
+  `convert#Fact` does for one.
 - `store#Piece`: a named piece, a condition written once and used by many rules. Its lines may use exists lines over
   its fact type's list fields.
 - `explain#RuleSet`: for one fact, whether each rule and each of its lines holds. It does no chaining.

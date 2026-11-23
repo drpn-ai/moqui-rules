@@ -28,6 +28,9 @@ class FactConversionParityTests extends Specification {
         ["FVT_TEXT", " 12 ", " 12 ", null],
         ["FVT_TEXT", 12, "12", null],
         ["FVT_TEXT", true, "true", null],
+        // a Map or a List is its Groovy string form
+        ["FVT_TEXT", [a: 1], "[a:1]", null],
+        ["FVT_TEXT", [1, 2], "[1, 2]", null],
         // integer: a whole number only, padding trimmed, a zero fraction allowed
         ["FVT_INTEGER", null, null, null],
         ["FVT_INTEGER", "", null, " is not a whole number"],
@@ -102,6 +105,8 @@ class FactConversionParityTests extends Specification {
         ["record id, unknown name, then bad values in field order", [qty: "x", _recordId: "r", amount: "y", zeta: 1], NULL_FACT - [qty: null, amount: null],
                 [RECORD_ID_PROBLEM, "Fact type ParityFact has no field zeta",
                  "Value y does not fit field amount of ParityFact", "Value x does not fit field qty of ParityFact"]],
+        // text holding < is converted as text by convert#Fact (no HTML refusal, unlike a direct convert#FactValue call)
+        ["text holding <", [label: "a<b"], NULL_FACT - [label: null] + [label: "a<b"], []],
         ["items null", [items: null], NULL_FACT, []],
         ["items empty", [items: []], NULL_FACT + [items: []], []],
         ["items a string", [items: "abc"], NULL_FACT - [items: null], ["Field items of ParityFact must be a list"]],
@@ -146,6 +151,15 @@ class FactConversionParityTests extends Specification {
     static final String CHECK_SET = "PARITY_CHECK_SET"
 
     void removeTestData() {
+        removeCheckData()
+        for (String factTypeId in TEST_FACT_TYPES) {
+            ec.entity.find("rules.FactField").condition("factTypeId", factTypeId).deleteAll()
+            ec.entity.find("rules.FactType").condition("factTypeId", factTypeId).deleteAll()
+        }
+    }
+
+    /** The check rule set and its checks, so a feature can build its own. */
+    void removeCheckData() {
         List<String> fileCheckIds = ec.entity.find("rules.FileCheck").condition("ruleSetId", CHECK_SET).list()*.fileCheckId
         if (fileCheckIds) {
             ec.entity.find("rules.FileCheckRecord").condition("fileCheckId", "in", fileCheckIds).deleteAll()
@@ -158,10 +172,6 @@ class FactConversionParityTests extends Specification {
         }
         for (String entityName in ["RuleSetOutcome", "RuleSetFactType", "RuleSet"])
             ec.entity.find("rules." + entityName).condition("ruleSetId", CHECK_SET).deleteAll()
-        for (String factTypeId in TEST_FACT_TYPES) {
-            ec.entity.find("rules.FactField").condition("factTypeId", factTypeId).deleteAll()
-            ec.entity.find("rules.FactType").condition("factTypeId", factTypeId).deleteAll()
-        }
     }
 
     void createFactType(String factTypeId, Map<String, String> fieldKinds) {
@@ -363,5 +373,65 @@ class FactConversionParityTests extends Specification {
         refused.checkedRecords[1].refusedReasons == ["It has 3 values, but the file has 2 columns",
                                                       "Value zz does not fit field count of ParityItem"]
         refused.checkedRecords[1].outcomes == null
+    }
+
+    def "a fact whose key is a GString is reported as an unknown field"() {
+        given:
+        def n = "qty"
+        Map values = ["${n}": 1]
+
+        when:
+        Map converted = convertFact("ParityFact", values)
+
+        then: "the key is not a String, so it matches no field; this is the behaviour of the compiled converter"
+        converted.fact == NULL_FACT
+        converted.problems == ["Fact type ParityFact has no field qty"]
+    }
+
+    def "convert#Fact and convert#Facts convert text holding < as text, with no errors"() {
+        when:
+        Map one = convertFact("ParityFact", [label: "a<b"])
+        Map many = ec.service.sync().name("moqui.rules.RuleServices.convert#Facts")
+                .parameters([entries: [[factTypeId: "ParityFact", values: [label: "a<b"]]]]).call()
+
+        then:
+        !ec.message.hasError()
+        one.fact.label == "a<b"
+        one.problems == []
+        many.results[0].fact.label == "a<b"
+        many.results[0].problems == []
+    }
+
+    def "a direct convert#FactValue call still gets Moqui's HTML refusal for text holding <"() {
+        when:
+        convert("FVT_TEXT", "a<b")
+
+        then: "that parameter has no allow-html, so Moqui refuses the value"
+        ec.message.hasError()
+        ec.message.errorsString.toLowerCase().with { it.contains("html") || it.contains("<") }
+
+        cleanup:
+        ec.message.clearErrors()
+    }
+
+    def "check#File checks a text cell holding < instead of refusing it"() {
+        given:
+        removeCheckData()
+        ec.entity.makeValue("rules.RuleSet").setAll([ruleSetId: CHECK_SET, firstMatchOnly: "Y"]).create()
+        ec.entity.makeValue("rules.RuleSetFactType").setAll([ruleSetId: CHECK_SET, factTypeId: "ParityItem"]).create()
+        ec.entity.makeValue("rules.RuleSetOutcome").setAll([ruleSetId: CHECK_SET, outcomeId: "PARITY_OK"]).create()
+        ec.service.sync().name("moqui.rules.RuleServices.store#Rule").parameters([ruleSetId: CHECK_SET, ruleName: "any", priority: 10,
+                conditions: [], actions: [[actionTypeId: "RAT_OUTCOME", outcomeId: "PARITY_OK"]]]).call()
+        assert !ec.message.hasError()
+
+        when:
+        Map out = ec.service.sync().name("moqui.rules.RuleServices.check#File").parameters([ruleSetId: CHECK_SET, factTypeId: "ParityItem",
+                fileName: "items.csv", fileText: "name,count\na<b,1\n"]).call()
+
+        then:
+        !ec.message.hasError()
+        out.checkedRecords*.recordNumber == [1]
+        out.checkedRecords[0].outcomes == ["PARITY_OK"]
+        out.checkedRecords[0].refusedReasons == null
     }
 }
