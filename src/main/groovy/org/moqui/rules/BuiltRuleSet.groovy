@@ -1,5 +1,6 @@
 package org.moqui.rules
 
+import groovy.transform.CompileStatic
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ScheduledThreadPoolExecutor
@@ -57,7 +58,7 @@ class BuiltRuleSet {
             session.setGlobal(MATCHES_GLOBAL, matchList)
             for (Map factEntry in facts) {
                 PrototypeFactInstance factInstance = prototypes.get((String) factEntry.factTypeId).newInstance()
-                ((Map) factEntry.fact).each { String fieldName, Object value -> factInstance.put(fieldName, value) }
+                copyValues((Map) factEntry.fact, factInstance)
                 if (factEntry.recordId != null) factInstance.put(RECORD_ID_FIELD, factEntry.recordId)
                 if (factEntry.factTypeId == groupFactTypeId) {
                     groupIndexes.put(factInstance, decisions.size())
@@ -109,6 +110,19 @@ class BuiltRuleSet {
         decided.decisions = groupFactTypeId == null ? [] : decisions.collect { Map decision ->
             [recordId: decision.recordId] + answerFor((List<Map>) decision.matchedRules, firstMatchOnly) }
         return decided
+    }
+
+    /**
+     * Puts each value of a fact on its instance, in the fact's key order. Statically compiled: it runs for every value of
+     * every fact, and dynamic dispatch on values of several classes relinks its call site value after value.
+     */
+    @CompileStatic
+    private static void copyValues(Map values, PrototypeFactInstance factInstance) {
+        if (values == null) return
+        for (Object e in values.entrySet()) {
+            Map.Entry entry = (Map.Entry) e
+            factInstance.put((String) entry.getKey(), entry.getValue())
+        }
     }
 
     private static Map answerFor(List<Map> matches, boolean firstMatchOnly) {
